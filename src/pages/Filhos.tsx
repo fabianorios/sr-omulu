@@ -49,7 +49,7 @@ export function Filhos() {
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <div className="animate-fade-in">
-        <h2 className="font-serif text-3xl font-semibold text-[var(--color-forest)] md:text-4xl">
+        <h2 className="font-serif text-2xl font-semibold text-[var(--color-forest)] sm:text-3xl md:text-4xl">
           Lista de Filhos
         </h2>
         <p className="mt-2 text-sm text-[var(--color-ink-muted)]">
@@ -71,7 +71,53 @@ export function Filhos() {
         />
       </div>
 
-      <div className="animate-fade-in-delay-2 overflow-x-auto rounded-lg border border-[var(--color-border)] bg-[var(--color-cream)]/80 shadow-sm">
+      <div className="animate-fade-in-delay-2 space-y-3 md:hidden">
+        {rows.map(({ filho, obr, status }) => (
+          <article
+            key={filho.id}
+            className="rounded-lg border border-[var(--color-border)] bg-[var(--color-cream)]/80 p-4 shadow-sm"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-semibold text-[var(--color-ink)]">
+                  {filho.nome}
+                </p>
+                <p className="mt-0.5 text-sm text-[var(--color-ink-muted)]">
+                  {filho.orixa}
+                </p>
+              </div>
+              {status && obr ? (
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  <StatusBadge status={status} />
+                  <span className="text-[11px] text-[var(--color-ink-faint)]">
+                    {formatBR(obr.data)}
+                  </span>
+                </div>
+              ) : null}
+            </div>
+            <dl className="mt-3 space-y-1 text-sm text-[var(--color-ink-muted)]">
+              <div className="flex justify-between gap-3">
+                <dt className="text-[var(--color-ink-faint)]">Iniciação</dt>
+                <dd>{formatBR(filho.iniciacao)}</dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-[var(--color-ink-faint)]">WhatsApp</dt>
+                <dd>{filho.telefone}</dd>
+              </div>
+            </dl>
+            <button
+              type="button"
+              onClick={() => setDetailId(filho.id)}
+              className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded border border-[var(--color-border)] bg-white/70 px-2.5 py-2 text-xs font-medium text-[var(--color-forest)] hover:bg-[var(--color-parchment)]"
+            >
+              <History size={13} />
+              Detalhes
+            </button>
+          </article>
+        ))}
+      </div>
+
+      <div className="animate-fade-in-delay-2 hidden overflow-x-auto rounded-lg border border-[var(--color-border)] bg-[var(--color-cream)]/80 shadow-sm md:block">
         <table className="w-full min-w-[900px] border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-[var(--color-border-soft)] text-[11px] tracking-wide text-[var(--color-ink-faint)] uppercase">

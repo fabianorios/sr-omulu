@@ -53,12 +53,12 @@ export function AgendarObrigacaoModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div
-      className="animate-backdrop fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-ink)]/40 p-4"
+      className="animate-backdrop fixed inset-0 z-50 flex items-end justify-center bg-[var(--color-ink)]/40 p-0 sm:items-center sm:p-4"
       onClick={onClose}
       role="presentation"
     >
       <div
-        className="animate-modal w-full max-w-md rounded-lg border border-[var(--color-border)] bg-[var(--color-cream)] shadow-xl"
+        className="animate-modal max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl border border-[var(--color-border)] bg-[var(--color-cream)] shadow-xl sm:rounded-lg"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-labelledby="agendar-title"

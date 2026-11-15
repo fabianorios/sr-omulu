@@ -131,7 +131,7 @@ export function Agenda() {
         <p className="text-xs font-semibold tracking-[0.18em] text-[var(--color-tan)] uppercase">
           Calendário
         </p>
-        <h2 className="mt-1 font-serif text-3xl font-semibold text-[var(--color-forest)] md:text-4xl">
+        <h2 className="mt-1 font-serif text-2xl font-semibold text-[var(--color-forest)] sm:text-3xl md:text-4xl">
           Agenda da Casa
         </h2>
         <p className="mt-2 text-sm text-[var(--color-ink-muted)]">
@@ -222,7 +222,7 @@ export function Agenda() {
                   type="button"
                   onClick={() => setSelected(day)}
                   className={[
-                    'flex min-h-[68px] flex-col items-center rounded-md border p-1.5 transition',
+                    'flex min-h-[48px] flex-col items-center rounded-md border p-1 transition sm:min-h-[68px] sm:p-1.5',
                     isSelected
                       ? 'border-[var(--color-gold)] bg-[var(--color-parchment)]'
                       : 'border-transparent hover:bg-[var(--color-parchment)]/70',
@@ -231,7 +231,9 @@ export function Agenda() {
                       : 'text-[var(--color-ink-faint)]/50',
                   ].join(' ')}
                 >
-                  <span className="text-sm font-medium">{format(day, 'd')}</span>
+                  <span className="text-xs font-medium sm:text-sm">
+                    {format(day, 'd')}
+                  </span>
                   <div className="mt-auto flex flex-wrap justify-center gap-0.5 pb-0.5">
                     {dots.slice(0, 4).map((d) => (
                       <span

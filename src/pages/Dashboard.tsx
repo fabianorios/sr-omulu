@@ -64,7 +64,7 @@ export function Dashboard() {
           <p className="text-xs font-semibold tracking-[0.18em] text-[var(--color-tan)] uppercase">
             Visão Geral
           </p>
-          <h2 className="mt-1 font-serif text-3xl font-semibold text-[var(--color-forest)] md:text-4xl">
+          <h2 className="mt-1 font-serif text-2xl font-semibold text-[var(--color-forest)] sm:text-3xl md:text-4xl">
             Dashboard da Casa
           </h2>
           <p className="mt-2 max-w-xl text-sm text-[var(--color-ink-muted)]">
@@ -131,7 +131,7 @@ export function Dashboard() {
           {alerts.slice(0, 8).map(({ filho, tipo, obrigacao, status }) => (
             <li
               key={obrigacao.id}
-              className="flex items-center justify-between gap-4 px-5 py-3.5"
+              className="flex items-center justify-between gap-3 px-4 py-3.5 sm:gap-4 sm:px-5"
             >
               <div className="min-w-0">
                 <p className="truncate font-semibold text-[var(--color-ink)]">

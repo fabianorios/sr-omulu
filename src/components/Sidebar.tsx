@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { CalendarDays, LayoutDashboard, Settings, Users } from 'lucide-react'
+import { CalendarDays, LayoutDashboard, Settings, Users, X } from 'lucide-react'
 import { Logo } from './Logo'
 
 const links = [
@@ -9,41 +9,71 @@ const links = [
   { to: '/config', label: 'Obrigações & Config.', icon: Settings },
 ]
 
-export function Sidebar() {
-  return (
-    <aside className="flex w-[240px] shrink-0 flex-col border-r border-[var(--color-border-soft)] bg-[var(--color-cream-deep)]/90 px-4 py-6">
-      <div className="mb-8 flex flex-col items-center gap-3 px-2 text-center">
-        <Logo size={64} />
-        <div>
-          <p className="font-serif text-xl font-semibold leading-tight text-[var(--color-forest)]">
-            Senhor Omulu
-          </p>
-          <p className="mt-1 text-[10px] font-semibold tracking-[0.22em] text-[var(--color-ink-faint)]">
-            IRMÃOS DE FÉ
-          </p>
-        </div>
-      </div>
+type SidebarProps = {
+  open?: boolean
+  onClose?: () => void
+}
 
-      <nav className="flex flex-col gap-1">
-        {links.map(({ to, label, icon: Icon, end }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={end}
-            className={({ isActive }) =>
-              [
-                'flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors',
-                isActive
-                  ? 'bg-[var(--color-parchment)] text-[var(--color-forest)] shadow-sm ring-1 ring-[var(--color-border)]'
-                  : 'text-[var(--color-ink-muted)] hover:bg-[var(--color-parchment)]/60 hover:text-[var(--color-forest)]',
-              ].join(' ')
-            }
+export function Sidebar({ open = false, onClose }: SidebarProps) {
+  return (
+    <>
+      <div
+        className={[
+          'fixed inset-0 z-40 bg-[var(--color-ink)]/40 transition-opacity md:hidden',
+          open ? 'opacity-100' : 'pointer-events-none opacity-0',
+        ].join(' ')}
+        onClick={onClose}
+        aria-hidden={!open}
+      />
+
+      <aside
+        className={[
+          'fixed inset-y-0 left-0 z-50 flex w-[min(280px,86vw)] shrink-0 flex-col border-r border-[var(--color-border-soft)] bg-[var(--color-cream-deep)] px-4 py-6 shadow-xl transition-transform duration-200 md:static md:z-auto md:w-[240px] md:shadow-none md:transition-none',
+          open ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+        ].join(' ')}
+        aria-label="Navegação principal"
+      >
+        <div className="mb-8 flex items-start justify-between gap-2 px-1">
+          <div className="flex flex-1 flex-col items-center text-center">
+            <Logo size={148} />
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md p-1.5 text-[var(--color-ink-muted)] hover:bg-[var(--color-parchment)] md:hidden"
+            aria-label="Fechar menu"
           >
-            <Icon size={18} strokeWidth={1.75} />
-            <span>{label}</span>
-          </NavLink>
-        ))}
-      </nav>
-    </aside>
+            <X size={20} />
+          </button>
+        </div>
+
+        <nav className="flex flex-col gap-1">
+          {links.map(({ to, label, icon: Icon, end }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={end}
+              onClick={onClose}
+              className={({ isActive }) =>
+                [
+                  'flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors',
+                  isActive
+                    ? 'bg-[var(--color-parchment)] text-[var(--color-forest)] shadow-sm ring-1 ring-[var(--color-border)]'
+                    : 'text-[var(--color-ink-muted)] hover:bg-[var(--color-parchment)]/60 hover:text-[var(--color-forest)]',
+                ].join(' ')
+              }
+            >
+              <Icon size={18} strokeWidth={1.75} />
+              <span>{label}</span>
+            </NavLink>
+          ))}
+        </nav>
+
+        <p className="mt-auto px-2 pt-6 text-center text-[10px] leading-relaxed text-[var(--color-ink-faint)]">
+          Tenda de Umbanda — Agenda e controle inteligente de obrigações dos
+          médiuns.
+        </p>
+      </aside>
+    </>
   )
 }

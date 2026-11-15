@@ -40,7 +40,7 @@ export function Config() {
   return (
     <div className="mx-auto max-w-3xl space-y-8">
       <div className="animate-fade-in">
-        <h2 className="font-serif text-3xl font-semibold text-[var(--color-forest)] md:text-4xl">
+        <h2 className="font-serif text-2xl font-semibold text-[var(--color-forest)] sm:text-3xl md:text-4xl">
           Tipos de Obrigações
         </h2>
         <p className="mt-2 text-sm text-[var(--color-ink-muted)]">

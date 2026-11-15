@@ -46,6 +46,16 @@ body {
     radial-gradient(ellipse at 90% 10%, rgba(27, 58, 42, 0.05), transparent 45%),
     linear-gradient(180deg, #fbf8f2 0%, var(--color-cream) 40%, #f5efe4 100%);
   -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
 }
 
 h1,
