@@ -1,0 +1,124 @@
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+  --font-sans: "Source Sans 3", "Segoe UI", sans-serif;
+
+  --color-cream: #faf7f0;
+  --color-cream-deep: #f3ede2;
+  --color-parchment: #ebe3d4;
+  --color-forest: #1b3a2a;
+  --color-forest-hover: #244a36;
+  --color-forest-muted: #2d5240;
+  --color-gold: #c4a35a;
+  --color-gold-soft: #d4bc7a;
+  --color-tan: #b8956c;
+  --color-ink: #2c2418;
+  --color-ink-muted: #5c5348;
+  --color-ink-faint: #8a7f70;
+  --color-border: #ddd2c0;
+  --color-border-soft: #e8dfd0;
+  --color-status-vencida-bg: #f5e0e0;
+  --color-status-vencida-fg: #9b3a3a;
+  --color-status-proxima-bg: #f5ebd4;
+  --color-status-proxima-fg: #8a6a2a;
+  --color-status-emdia-bg: #dce8df;
+  --color-status-emdia-fg: #2d5a3c;
+  --color-house-event: #1a1a1a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  background:
+    radial-gradient(ellipse at 20% 0%, rgba(196, 163, 90, 0.08), transparent 50%),
+    radial-gradient(ellipse at 90% 10%, rgba(27, 58, 42, 0.05), transparent 45%),
+    linear-gradient(180deg, #fbf8f2 0%, var(--color-cream) 40%, #f5efe4 100%);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+.font-serif {
+  font-family: var(--font-serif);
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.45s ease-out both;
+}
+
+.animate-fade-in-delay-1 {
+  animation: fade-in 0.45s ease-out 0.08s both;
+}
+
+.animate-fade-in-delay-2 {
+  animation: fade-in 0.45s ease-out 0.16s both;
+}
+
+.animate-backdrop {
+  animation: backdrop-in 0.2s ease-out both;
+}
+
+.animate-modal {
+  animation: modal-in 0.28s ease-out both;
+}
