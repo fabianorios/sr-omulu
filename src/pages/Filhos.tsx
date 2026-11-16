@@ -31,7 +31,6 @@ export function Filhos() {
         if (!q) return true
         const hay = [
           f.nome,
-          f.orixa,
           f.paiDeCabeca,
           f.maeDeCabeca,
           ...f.guias,
@@ -72,7 +71,7 @@ export function Filhos() {
           </h2>
           <p className="mt-2 text-sm text-[var(--color-ink-muted)]">
             Cadastro completo: pai/mãe de cabeça, guias, datas, telefones e
-            endereço. Busque por nome, Orixá ou guia.
+            endereço. Busque por nome, pai, mãe ou guia.
           </p>
         </div>
         <button
@@ -96,7 +95,7 @@ export function Filhos() {
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar por nome, Orixá, guia ou cidade..."
+          placeholder="Buscar por nome, pai, mãe, guia ou cidade..."
           className="w-full rounded-md border border-[var(--color-border)] bg-white/80 py-2.5 pr-4 pl-10 text-sm outline-none focus:border-[var(--color-forest)] focus:ring-2 focus:ring-[var(--color-forest)]/15"
         />
       </div>
@@ -117,9 +116,7 @@ export function Filhos() {
                   {filho.nome}
                 </p>
                 <p className="mt-0.5 text-sm text-[var(--color-ink-muted)]">
-                  {filho.orixa}
-                  {filho.paiDeCabeca ? ` · Pai ${filho.paiDeCabeca}` : ''}
-                  {filho.maeDeCabeca ? ` · Mãe ${filho.maeDeCabeca}` : ''}
+                  Pai {filho.paiDeCabeca} · Mãe {filho.maeDeCabeca}
                 </p>
                 {filho.guias.length > 0 ? (
                   <p className="mt-1 text-xs text-[var(--color-ink-faint)]">
@@ -185,7 +182,7 @@ export function Filhos() {
           <thead>
             <tr className="border-b border-[var(--color-border-soft)] text-[11px] tracking-wide text-[var(--color-ink-faint)] uppercase">
               <th className="px-4 py-3 font-semibold">Nome</th>
-              <th className="px-4 py-3 font-semibold">Orixá / Pai / Mãe</th>
+              <th className="px-4 py-3 font-semibold">Pai / Mãe</th>
               <th className="px-4 py-3 font-semibold">Guias</th>
               <th className="px-4 py-3 font-semibold">Datas</th>
               <th className="px-4 py-3 font-semibold">Telefones</th>
@@ -201,10 +198,9 @@ export function Filhos() {
                   {filho.nome}
                 </td>
                 <td className="px-4 py-3.5 text-[var(--color-ink-muted)]">
-                  <div>{filho.orixa}</div>
+                  <div>Pai {filho.paiDeCabeca}</div>
                   <div className="text-xs text-[var(--color-ink-faint)]">
-                    Pai {filho.paiDeCabeca || '—'} · Mãe{' '}
-                    {filho.maeDeCabeca || '—'}
+                    Mãe {filho.maeDeCabeca}
                   </div>
                 </td>
                 <td className="max-w-[160px] px-4 py-3.5 text-xs text-[var(--color-ink-muted)]">
@@ -281,9 +277,8 @@ export function Filhos() {
               {detailFilho.nome}
             </h3>
             <dl className="mt-3 space-y-1.5 text-sm text-[var(--color-ink-muted)]">
-              <div>Orixá de cabeça: {detailFilho.orixa}</div>
-              <div>Pai de cabeça: {detailFilho.paiDeCabeca || '—'}</div>
-              <div>Mãe de cabeça: {detailFilho.maeDeCabeca || '—'}</div>
+              <div>Pai de cabeça: {detailFilho.paiDeCabeca}</div>
+              <div>Mãe de cabeça: {detailFilho.maeDeCabeca}</div>
               <div>
                 Guias:{' '}
                 {detailFilho.guias.length

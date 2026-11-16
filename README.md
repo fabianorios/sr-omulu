@@ -31,7 +31,7 @@ Do not commit or paste `DATABASE_URL`.
 
 ## Cadastro de filhos
 
-Pai/mãe de cabeça, guias (vários), nascimento, entrada no terreiro, até 2 telefones, endereço + CEP (ViaCEP), orixá/iniciação.
+Pai/mãe de cabeça (listas fixas A–Z), guias multi-select (lista fixa A–Z), nascimento, entrada no terreiro, iniciação, até 2 telefones, endereço + CEP (ViaCEP).
 
 ## Publicação
 

@@ -1,9 +1,16 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
-import { Loader2, Plus, Trash2, UserPlus, X } from 'lucide-react'
-import { ORIXAS } from '../../data/mock'
+import { Loader2, UserPlus, X } from 'lucide-react'
+import {
+  GUIAS,
+  MAES_DE_CABECA,
+  PAIS_DE_CABECA,
+  type Guia,
+  type MaeDeCabeca,
+  type PaiDeCabeca,
+} from '../../data/catalog'
 import { useApp } from '../../context/AppContext'
 import { formatCep, lookupCep } from '../../lib/viacep'
-import type { Endereco, Filho, Orixa } from '../../types'
+import type { Endereco, Filho } from '../../types'
 import { emptyEndereco } from '../../types'
 
 type Props = {
@@ -20,12 +27,13 @@ export function NovoFilhoModal({ onClose, initial = null }: Props) {
   const [cepLoading, setCepLoading] = useState(false)
 
   const [nome, setNome] = useState(initial?.nome ?? '')
-  const [orixa, setOrixa] = useState<Orixa>(initial?.orixa ?? 'Omulu')
-  const [paiDeCabeca, setPaiDeCabeca] = useState(initial?.paiDeCabeca ?? '')
-  const [maeDeCabeca, setMaeDeCabeca] = useState(initial?.maeDeCabeca ?? '')
-  const [guias, setGuias] = useState<string[]>(
-    initial?.guias?.length ? initial.guias : [''],
+  const [paiDeCabeca, setPaiDeCabeca] = useState<PaiDeCabeca>(
+    initial?.paiDeCabeca ?? 'Omulu',
   )
+  const [maeDeCabeca, setMaeDeCabeca] = useState<MaeDeCabeca>(
+    initial?.maeDeCabeca ?? 'Oxum',
+  )
+  const [guias, setGuias] = useState<Guia[]>(initial?.guias ?? [])
   const [dataNascimento, setDataNascimento] = useState(
     initial?.dataNascimento ?? '',
   )
@@ -38,18 +46,11 @@ export function NovoFilhoModal({ onClose, initial = null }: Props) {
     initial?.endereco ?? emptyEndereco(),
   )
 
-  function updateGuia(index: number, value: string) {
-    setGuias((prev) => prev.map((g, i) => (i === index ? value : g)))
-  }
-
-  function addGuia() {
-    setGuias((prev) => [...prev, ''])
-  }
-
-  function removeGuia(index: number) {
-    setGuias((prev) =>
-      prev.length <= 1 ? [''] : prev.filter((_, i) => i !== index),
-    )
+  function toggleGuia(guia: Guia) {
+    setGuias((prev) => {
+      if (prev.includes(guia)) return prev.filter((g) => g !== guia)
+      return [...prev, guia].sort((a, b) => a.localeCompare(b, 'pt-BR'))
+    })
   }
 
   async function handleCepLookup() {
@@ -84,10 +85,9 @@ export function NovoFilhoModal({ onClose, initial = null }: Props) {
     }
     const payload = {
       nome: nome.trim(),
-      orixa,
-      paiDeCabeca: paiDeCabeca.trim() || orixa,
-      maeDeCabeca: maeDeCabeca.trim(),
-      guias: guias.map((g) => g.trim()).filter(Boolean),
+      paiDeCabeca,
+      maeDeCabeca,
+      guias: [...guias].sort((a, b) => a.localeCompare(b, 'pt-BR')),
       dataNascimento,
       dataEntrada,
       iniciacao,
@@ -101,9 +101,10 @@ export function NovoFilhoModal({ onClose, initial = null }: Props) {
       },
     }
     setSaving(true)
-    const result = editing && initial
-      ? await updateFilho(initial.id, payload)
-      : await addFilho(payload)
+    const result =
+      editing && initial
+        ? await updateFilho(initial.id, payload)
+        : await addFilho(payload)
     setSaving(false)
     if (!result.ok) {
       setError(result.error ?? 'Não foi possível salvar.')
@@ -155,74 +156,66 @@ export function NovoFilhoModal({ onClose, initial = null }: Props) {
                 className="field-input"
               />
             </Field>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <Field label="Orixá de cabeça">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Pai de cabeça">
                 <select
-                  value={orixa}
-                  onChange={(e) => setOrixa(e.target.value as Orixa)}
+                  required
+                  value={paiDeCabeca}
+                  onChange={(e) =>
+                    setPaiDeCabeca(e.target.value as PaiDeCabeca)
+                  }
                   className="field-input"
                 >
-                  {ORIXAS.map((o) => (
+                  {PAIS_DE_CABECA.map((o) => (
                     <option key={o} value={o}>
                       {o}
                     </option>
                   ))}
                 </select>
               </Field>
-              <Field label="Pai de cabeça">
-                <input
-                  value={paiDeCabeca}
-                  onChange={(e) => setPaiDeCabeca(e.target.value)}
-                  placeholder="Ex.: Omulu"
-                  list="orixas-list"
-                  className="field-input"
-                />
-              </Field>
               <Field label="Mãe de cabeça">
-                <input
+                <select
+                  required
                   value={maeDeCabeca}
-                  onChange={(e) => setMaeDeCabeca(e.target.value)}
-                  placeholder="Ex.: Nanã"
-                  list="orixas-list"
+                  onChange={(e) =>
+                    setMaeDeCabeca(e.target.value as MaeDeCabeca)
+                  }
                   className="field-input"
-                />
+                >
+                  {MAES_DE_CABECA.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
               </Field>
             </div>
-            <datalist id="orixas-list">
-              {ORIXAS.map((o) => (
-                <option key={o} value={o} />
-              ))}
-            </datalist>
           </Section>
 
           <Section title="Guias que atuam com o médium">
-            <div className="space-y-2">
-              {guias.map((guia, index) => (
-                <div key={index} className="flex gap-2">
-                  <input
-                    value={guia}
-                    onChange={(e) => updateGuia(index, e.target.value)}
-                    placeholder={`Nome da guia ${index + 1}`}
-                    className="field-input"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeGuia(index)}
-                    className="rounded-md border border-[var(--color-border)] px-2 text-[var(--color-ink-muted)] hover:bg-[var(--color-parchment)]"
-                    aria-label="Remover guia"
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {GUIAS.map((guia) => {
+                const checked = guias.includes(guia)
+                return (
+                  <label
+                    key={guia}
+                    className={[
+                      'flex cursor-pointer items-center gap-2 rounded-md border px-2.5 py-2 text-sm',
+                      checked
+                        ? 'border-[var(--color-forest)] bg-[var(--color-parchment)] text-[var(--color-forest)]'
+                        : 'border-[var(--color-border)] bg-white/80 text-[var(--color-ink-muted)]',
+                    ].join(' ')}
                   >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={addGuia}
-                className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--color-forest)] hover:underline"
-              >
-                <Plus size={14} />
-                Adicionar guia
-              </button>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleGuia(guia)}
+                      className="accent-[var(--color-forest)]"
+                    />
+                    <span>{guia}</span>
+                  </label>
+                )
+              })}
             </div>
           </Section>
 

@@ -1,13 +1,4 @@
-export type Orixa =
-  | 'Omulu'
-  | 'Ogum'
-  | 'Iemanjá'
-  | 'Xangô'
-  | 'Oxum'
-  | 'Oxalá'
-  | 'Iansã'
-  | 'Oxóssi'
-  | 'Nanã'
+import type { Guia, MaeDeCabeca, PaiDeCabeca } from './data/catalog'
 
 export type ObligationStatus = 'em_dia' | 'proxima' | 'vencida'
 
@@ -42,11 +33,9 @@ export interface Endereco {
 export interface Filho {
   id: string
   nome: string
-  /** Orixá de cabeça (campo legado / principal da corrente). */
-  orixa: Orixa
-  paiDeCabeca: string
-  maeDeCabeca: string
-  guias: string[]
+  paiDeCabeca: PaiDeCabeca
+  maeDeCabeca: MaeDeCabeca
+  guias: Guia[]
   dataNascimento: string
   dataEntrada: string
   iniciacao: string

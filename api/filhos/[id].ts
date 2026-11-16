@@ -1,6 +1,23 @@
 import { requireIdentity } from '../../cursor/identity'
 import { dbMode, json, sql, type FilhoRow } from '../../lib/db'
 
+const PAIS = new Set(['Ogum', 'Omulu', 'Oxossi', 'Xango'])
+const MAES = new Set(['Iansã', 'Iemanjá', 'Nanã Buruquê', 'Oxum'])
+const GUIAS = new Set([
+  'Baiano',
+  'Boiadeiro',
+  'Caboclo',
+  'Cigano',
+  'Erê',
+  'Exu',
+  'Exu Mirim',
+  'Malandro',
+  'Marinheiro',
+  'Marujo',
+  'Pomba-Gira',
+  'Preto Velho',
+])
+
 function idFromUrl(request: Request): string | null {
   const url = new URL(request.url)
   const parts = url.pathname.split('/').filter(Boolean)
@@ -49,15 +66,23 @@ export async function PATCH(request: Request): Promise<Response> {
   }
 
   if (body.nome != null) push('nome', String(body.nome).trim())
-  if (body.orixa != null) push('orixa', String(body.orixa).trim())
+
   if ('paiDeCabeca' in body || 'pai_de_cabeca' in body) {
-    push('pai_de_cabeca', emptyToNull(body.paiDeCabeca ?? body.pai_de_cabeca))
+    const pai = String(body.paiDeCabeca ?? body.pai_de_cabeca ?? '').trim()
+    if (!PAIS.has(pai)) return json({ error: 'invalid_pai' }, 400)
+    push('pai_de_cabeca', pai)
   }
   if ('maeDeCabeca' in body || 'mae_de_cabeca' in body) {
-    push('mae_de_cabeca', emptyToNull(body.maeDeCabeca ?? body.mae_de_cabeca))
+    const mae = String(body.maeDeCabeca ?? body.mae_de_cabeca ?? '').trim()
+    if (!MAES.has(mae)) return json({ error: 'invalid_mae' }, 400)
+    push('mae_de_cabeca', mae)
   }
   if (Array.isArray(body.guias)) {
-    params.push(body.guias.map((g) => String(g).trim()).filter(Boolean))
+    const guias = body.guias
+      .map((g) => String(g).trim())
+      .filter((g) => GUIAS.has(g))
+      .sort((a, b) => a.localeCompare(b, 'pt-BR'))
+    params.push(guias)
     sets.push(`guias = $${params.length}::text[]`)
   }
   if ('dataNascimento' in body || 'data_nascimento' in body) {
@@ -103,6 +128,11 @@ export async function PATCH(request: Request): Promise<Response> {
       emptyToNull(endereco?.cidade ?? body.endereco_cidade),
     )
     push('endereco_uf', emptyToNull(endereco?.uf ?? body.endereco_uf))
+  }
+
+  // Clear legacy orixá field when updating spiritual lineage
+  if ('paiDeCabeca' in body || 'maeDeCabeca' in body || Array.isArray(body.guias)) {
+    push('orixa', '')
   }
 
   if (sets.length === 0) return json({ error: 'empty_patch' }, 400)

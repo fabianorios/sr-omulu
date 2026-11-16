@@ -138,7 +138,8 @@ export function Dashboard() {
                   {filho.nome}
                 </p>
                 <p className="mt-0.5 truncate text-sm text-[var(--color-ink-muted)]">
-                  {filho.orixa} · {tipo.name} · {formatBR(obrigacao.data)}
+                  Pai {filho.paiDeCabeca} · Mãe {filho.maeDeCabeca} ·{' '}
+                  {tipo.name} · {formatBR(obrigacao.data)}
                 </p>
               </div>
               <StatusBadge status={status} />

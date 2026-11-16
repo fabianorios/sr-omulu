@@ -1,11 +1,18 @@
-import type { Filho, FilhoInput, Orixa } from '../types'
+import {
+  filterValidGuias,
+  isMaeDeCabeca,
+  isPaiDeCabeca,
+  type MaeDeCabeca,
+  type PaiDeCabeca,
+} from '../data/catalog'
+import type { Filho, FilhoInput } from '../types'
 import { emptyEndereco } from '../types'
 
 /** Shape returned by /api/filhos (snake_case from Postgres). */
 export type FilhoRow = {
   id: string
   nome: string
-  orixa: string
+  orixa?: string | null
   pai_de_cabeca: string | null
   mae_de_cabeca: string | null
   guias: string[] | null
@@ -24,22 +31,30 @@ export type FilhoRow = {
   endereco_uf: string | null
 }
 
-const LOCAL_KEY = 'sr-omulu.filhos.v1'
+const LOCAL_KEY = 'sr-omulu.filhos.v2'
 
 function asDateInput(value: string | null | undefined): string {
   if (!value) return ''
-  // Postgres/PGlite may return "1990-01-01" or ISO timestamps
   return value.slice(0, 10)
+}
+
+function fallbackPai(raw: string | null | undefined): PaiDeCabeca {
+  if (raw && isPaiDeCabeca(raw)) return raw
+  return 'Omulu'
+}
+
+function fallbackMae(raw: string | null | undefined): MaeDeCabeca {
+  if (raw && isMaeDeCabeca(raw)) return raw
+  return 'Oxum'
 }
 
 export function rowToFilho(row: FilhoRow): Filho {
   return {
     id: row.id,
     nome: row.nome,
-    orixa: row.orixa as Orixa,
-    paiDeCabeca: row.pai_de_cabeca ?? '',
-    maeDeCabeca: row.mae_de_cabeca ?? '',
-    guias: row.guias ?? [],
+    paiDeCabeca: fallbackPai(row.pai_de_cabeca),
+    maeDeCabeca: fallbackMae(row.mae_de_cabeca),
+    guias: filterValidGuias(row.guias ?? []),
     dataNascimento: asDateInput(row.data_nascimento),
     dataEntrada: asDateInput(row.data_entrada),
     iniciacao: asDateInput(row.iniciacao),
@@ -61,10 +76,11 @@ export function rowToFilho(row: FilhoRow): Filho {
 export function filhoToPayload(filho: FilhoInput) {
   return {
     nome: filho.nome,
-    orixa: filho.orixa,
     paiDeCabeca: filho.paiDeCabeca,
     maeDeCabeca: filho.maeDeCabeca,
-    guias: filho.guias,
+    guias: filterValidGuias(filho.guias).sort((a, b) =>
+      a.localeCompare(b, 'pt-BR'),
+    ),
     dataNascimento: filho.dataNascimento,
     dataEntrada: filho.dataEntrada,
     iniciacao: filho.iniciacao,
@@ -133,21 +149,6 @@ export async function createFilhoViaApi(
   }
 }
 
-export function loadLocalFilhos(): Filho[] {
-  try {
-    const raw = localStorage.getItem(LOCAL_KEY)
-    if (!raw) return []
-    const parsed = JSON.parse(raw) as Filho[]
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
-}
-
-export function saveLocalFilhos(filhos: Filho[]) {
-  localStorage.setItem(LOCAL_KEY, JSON.stringify(filhos))
-}
-
 export async function updateFilhoViaApi(
   id: string,
   filho: FilhoInput,
@@ -178,4 +179,25 @@ export async function updateFilhoViaApi(
   } catch {
     return { ok: false, error: 'network' }
   }
+}
+
+export function loadLocalFilhos(): Filho[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as Filho[]
+    if (!Array.isArray(parsed)) return []
+    return parsed.map((f) => ({
+      ...f,
+      paiDeCabeca: fallbackPai(f.paiDeCabeca),
+      maeDeCabeca: fallbackMae(f.maeDeCabeca),
+      guias: filterValidGuias(f.guias ?? []),
+    }))
+  } catch {
+    return []
+  }
+}
+
+export function saveLocalFilhos(filhos: Filho[]) {
+  localStorage.setItem(LOCAL_KEY, JSON.stringify(filhos))
 }

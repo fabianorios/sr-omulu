@@ -12,9 +12,10 @@ import {
 } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { ORIXAS, REFERENCE_DATE } from '../data/mock'
+import { PAIS_DE_CABECA, type PaiDeCabeca } from '../data/catalog'
+import { REFERENCE_DATE } from '../data/mock'
 import { useApp } from '../context/AppContext'
-import type { ObligationTypeId, Orixa } from '../types'
+import type { ObligationTypeId } from '../types'
 import { formatBR, formatLongDay, parseDate } from '../utils/status'
 
 const WEEKDAYS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB']
@@ -23,7 +24,7 @@ export function Agenda() {
   const { state } = useApp()
   const [month, setMonth] = useState(() => startOfMonth(REFERENCE_DATE))
   const [selected, setSelected] = useState(() => REFERENCE_DATE)
-  const [filterOrixa, setFilterOrixa] = useState<Orixa | 'Todos'>('Todos')
+  const [filterPai, setFilterPai] = useState<PaiDeCabeca | 'Todos'>('Todos')
   const [filterTipo, setFilterTipo] = useState<ObligationTypeId | 'Todos'>(
     'Todos',
   )
@@ -41,11 +42,11 @@ export function Agenda() {
     return state.obrigacoes.filter((o) => {
       const filho = filhoMap.get(o.filhoId)
       if (!filho) return false
-      if (filterOrixa !== 'Todos' && filho.orixa !== filterOrixa) return false
+      if (filterPai !== 'Todos' && filho.paiDeCabeca !== filterPai) return false
       if (filterTipo !== 'Todos' && o.tipoId !== filterTipo) return false
       return true
     })
-  }, [state.obrigacoes, filhoMap, filterOrixa, filterTipo])
+  }, [state.obrigacoes, filhoMap, filterPai, filterTipo])
 
   const days = useMemo(() => {
     const start = startOfWeek(startOfMonth(month), { weekStartsOn: 0 })
@@ -96,7 +97,7 @@ export function Agenda() {
           items.push({
             id: o.id,
             title: filho.nome,
-            detail: `${tipo.name} · ${filho.orixa}`,
+            detail: `${tipo.name} · Pai ${filho.paiDeCabeca} · Mãe ${filho.maeDeCabeca}`,
             color: tipo.color,
           })
         }
@@ -141,16 +142,16 @@ export function Agenda() {
 
       <div className="animate-fade-in-delay-1 flex flex-wrap gap-3">
         <label className="flex flex-col gap-1 text-xs font-semibold text-[var(--color-ink-muted)] uppercase">
-          Orixá de cabeça
+          Pai de cabeça
           <select
-            value={filterOrixa}
+            value={filterPai}
             onChange={(e) =>
-              setFilterOrixa(e.target.value as Orixa | 'Todos')
+              setFilterPai(e.target.value as PaiDeCabeca | 'Todos')
             }
             className="min-w-[160px] rounded-md border border-[var(--color-border)] bg-white px-3 py-2 text-sm font-normal normal-case text-[var(--color-ink)]"
           >
             <option value="Todos">Todos</option>
-            {ORIXAS.map((o) => (
+            {PAIS_DE_CABECA.map((o) => (
               <option key={o} value={o}>
                 {o}
               </option>

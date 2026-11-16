@@ -56,7 +56,7 @@ export function json(
 export type FilhoRow = {
   id: string
   nome: string
-  orixa: string
+  orixa?: string | null
   pai_de_cabeca: string | null
   mae_de_cabeca: string | null
   guias: string[] | null

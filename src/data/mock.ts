@@ -1,17 +1,6 @@
-import type { AppState, Filho, ObligationType, Orixa } from '../types'
+import type { AppState, Filho, ObligationType } from '../types'
 import { emptyEndereco } from '../types'
-
-export const ORIXAS: Orixa[] = [
-  'Omulu',
-  'Ogum',
-  'Iemanjá',
-  'Xangô',
-  'Oxum',
-  'Oxalá',
-  'Iansã',
-  'Oxóssi',
-  'Nanã',
-]
+import type { Guia, MaeDeCabeca, PaiDeCabeca } from './catalog'
 
 export const DEFAULT_TIPOS: ObligationType[] = [
   {
@@ -68,16 +57,10 @@ export const DEFAULT_TIPOS: ObligationType[] = [
 /** Data de referência da demo (Novembro 2026). */
 export const REFERENCE_DATE = new Date(2026, 10, 15)
 
-function sampleFilho(
-  partial: Omit<Filho, 'endereco' | 'guias' | 'paiDeCabeca' | 'maeDeCabeca' | 'telefone2' | 'dataNascimento' | 'dataEntrada'> &
-    Partial<Filho>,
+function sample(
+  partial: Omit<Filho, 'endereco' | 'telefone2'> & Partial<Filho>,
 ): Filho {
   return {
-    paiDeCabeca: partial.paiDeCabeca ?? partial.orixa,
-    maeDeCabeca: partial.maeDeCabeca ?? '',
-    guias: partial.guias ?? ['Guia Exemplo'],
-    dataNascimento: partial.dataNascimento ?? '1990-01-01',
-    dataEntrada: partial.dataEntrada ?? partial.iniciacao,
     telefone2: partial.telefone2 ?? '',
     endereco: partial.endereco ?? {
       ...emptyEndereco(),
@@ -89,151 +72,159 @@ function sampleFilho(
       uf: 'SP',
     },
     ...partial,
-    telefone1: partial.telefone1,
   }
 }
 
-/**
- * Dados de exemplo anonimizados (não são pessoas reais).
- * Usados só quando Supabase não está configurado.
- */
+/** Dados de exemplo anonimizados (não são pessoas reais). */
 export function createSampleFilhos(): Filho[] {
-  return [
-    sampleFilho({
+  const rows: Array<{
+    id: string
+    pai: PaiDeCabeca
+    mae: MaeDeCabeca
+    guias: Guia[]
+    iniciacao: string
+    entrada: string
+    nasc: string
+    tel: string
+    tel2?: string
+  }> = [
+    {
       id: 'f1',
-      nome: 'Médium Exemplo 01',
-      orixa: 'Omulu',
-      paiDeCabeca: 'Omulu',
-      maeDeCabeca: 'Nanã',
-      guias: ['Pretos Velhos', 'Caboclo Exemplo'],
+      pai: 'Omulu',
+      mae: 'Nanã Buruquê',
+      guias: ['Caboclo', 'Preto Velho'],
       iniciacao: '2019-08-12',
-      dataEntrada: '2018-03-10',
-      dataNascimento: '1992-05-14',
-      telefone1: '(11) 90000-0001',
-    }),
-    sampleFilho({
+      entrada: '2018-03-10',
+      nasc: '1992-05-14',
+      tel: '(11) 90000-0001',
+    },
+    {
       id: 'f2',
-      nome: 'Médium Exemplo 02',
-      orixa: 'Ogum',
-      paiDeCabeca: 'Ogum',
-      maeDeCabeca: 'Iansã',
-      guias: ['Exu Exemplo'],
+      pai: 'Ogum',
+      mae: 'Iansã',
+      guias: ['Exu'],
       iniciacao: '2017-03-22',
-      dataEntrada: '2016-01-15',
-      telefone1: '(11) 90000-0002',
-    }),
-    sampleFilho({
+      entrada: '2016-01-15',
+      nasc: '1988-02-01',
+      tel: '(11) 90000-0002',
+    },
+    {
       id: 'f3',
-      nome: 'Médium Exemplo 03',
-      orixa: 'Iemanjá',
-      paiDeCabeca: 'Oxalá',
-      maeDeCabeca: 'Iemanjá',
-      guias: ['Sereia Exemplo', 'Marinheiro Exemplo'],
+      pai: 'Oxossi',
+      mae: 'Iemanjá',
+      guias: ['Marinheiro', 'Marujo'],
       iniciacao: '2021-02-02',
-      dataEntrada: '2020-08-01',
-      telefone1: '(11) 90000-0003',
-    }),
-    sampleFilho({
+      entrada: '2020-08-01',
+      nasc: '1995-11-20',
+      tel: '(11) 90000-0003',
+    },
+    {
       id: 'f4',
-      nome: 'Médium Exemplo 04',
-      orixa: 'Xangô',
-      paiDeCabeca: 'Xangô',
-      maeDeCabeca: 'Oxum',
-      guias: ['Boadeiro Exemplo'],
+      pai: 'Xango',
+      mae: 'Oxum',
+      guias: ['Boiadeiro'],
       iniciacao: '2015-11-08',
-      dataEntrada: '2014-06-20',
-      telefone1: '(11) 90000-0004',
-    }),
-    sampleFilho({
+      entrada: '2014-06-20',
+      nasc: '1985-07-09',
+      tel: '(11) 90000-0004',
+    },
+    {
       id: 'f5',
-      nome: 'Médium Exemplo 05',
-      orixa: 'Oxum',
-      paiDeCabeca: 'Oxóssi',
-      maeDeCabeca: 'Oxum',
-      guias: ['Cigana Exemplo'],
+      pai: 'Oxossi',
+      mae: 'Oxum',
+      guias: ['Cigano'],
       iniciacao: '2020-06-15',
-      dataEntrada: '2019-11-02',
-      telefone1: '(11) 90000-0005',
-    }),
-    sampleFilho({
+      entrada: '2019-11-02',
+      nasc: '1993-03-18',
+      tel: '(11) 90000-0005',
+    },
+    {
       id: 'f6',
-      nome: 'Médium Exemplo 06',
-      orixa: 'Oxalá',
-      paiDeCabeca: 'Oxalá',
-      maeDeCabeca: 'Nanã',
-      guias: ['Baiano Exemplo'],
+      pai: 'Omulu',
+      mae: 'Nanã Buruquê',
+      guias: ['Baiano'],
       iniciacao: '2018-01-20',
-      dataEntrada: '2017-04-12',
-      telefone1: '(11) 90000-0006',
-    }),
-    sampleFilho({
+      entrada: '2017-04-12',
+      nasc: '1990-09-30',
+      tel: '(11) 90000-0006',
+    },
+    {
       id: 'f7',
-      nome: 'Médium Exemplo 07',
-      orixa: 'Iansã',
-      paiDeCabeca: 'Ogum',
-      maeDeCabeca: 'Iansã',
-      guias: ['Pomba Gira Exemplo'],
+      pai: 'Ogum',
+      mae: 'Iansã',
+      guias: ['Pomba-Gira'],
       iniciacao: '2022-09-30',
-      dataEntrada: '2022-01-08',
-      telefone1: '(11) 90000-0007',
-    }),
-    sampleFilho({
+      entrada: '2022-01-08',
+      nasc: '1998-12-05',
+      tel: '(11) 90000-0007',
+    },
+    {
       id: 'f8',
-      nome: 'Médium Exemplo 08',
-      orixa: 'Oxóssi',
-      paiDeCabeca: 'Oxóssi',
-      maeDeCabeca: 'Oxum',
-      guias: ['Caboclo da Mata'],
+      pai: 'Oxossi',
+      mae: 'Oxum',
+      guias: ['Caboclo'],
       iniciacao: '2016-05-04',
-      dataEntrada: '2015-09-18',
-      telefone1: '(11) 90000-0008',
-    }),
-    sampleFilho({
+      entrada: '2015-09-18',
+      nasc: '1987-06-22',
+      tel: '(11) 90000-0008',
+    },
+    {
       id: 'f9',
-      nome: 'Médium Exemplo 09',
-      orixa: 'Nanã',
-      paiDeCabeca: 'Omulu',
-      maeDeCabeca: 'Nanã',
-      guias: ['Preto Velho Exemplo'],
+      pai: 'Omulu',
+      mae: 'Nanã Buruquê',
+      guias: ['Preto Velho'],
       iniciacao: '2014-12-18',
-      dataEntrada: '2013-07-22',
-      telefone1: '(11) 90000-0009',
-    }),
-    sampleFilho({
+      entrada: '2013-07-22',
+      nasc: '1982-01-11',
+      tel: '(11) 90000-0009',
+    },
+    {
       id: 'f10',
-      nome: 'Médium Exemplo 10',
-      orixa: 'Omulu',
-      paiDeCabeca: 'Omulu',
-      maeDeCabeca: 'Iemanjá',
-      guias: ['Erê Exemplo'],
+      pai: 'Omulu',
+      mae: 'Iemanjá',
+      guias: ['Erê'],
       iniciacao: '2023-04-07',
-      dataEntrada: '2022-12-01',
-      telefone1: '(11) 90000-0010',
-    }),
-    sampleFilho({
+      entrada: '2022-12-01',
+      nasc: '2000-08-08',
+      tel: '(11) 90000-0010',
+    },
+    {
       id: 'f11',
-      nome: 'Médium Exemplo 11',
-      orixa: 'Ogum',
-      paiDeCabeca: 'Ogum',
-      maeDeCabeca: 'Oxum',
-      guias: ['Zé Pilintra Exemplo'],
+      pai: 'Ogum',
+      mae: 'Oxum',
+      guias: ['Malandro'],
       iniciacao: '2019-11-25',
-      dataEntrada: '2019-02-14',
-      telefone1: '(11) 90000-0011',
-    }),
-    sampleFilho({
+      entrada: '2019-02-14',
+      nasc: '1991-04-04',
+      tel: '(11) 90000-0011',
+    },
+    {
       id: 'f12',
-      nome: 'Médium Exemplo 12',
-      orixa: 'Oxum',
-      paiDeCabeca: 'Xangô',
-      maeDeCabeca: 'Oxum',
-      guias: ['Cigano Exemplo', 'Marinheiro Exemplo'],
+      pai: 'Xango',
+      mae: 'Oxum',
+      guias: ['Cigano', 'Marinheiro'],
       iniciacao: '2021-07-14',
-      dataEntrada: '2020-10-30',
-      telefone1: '(11) 90000-0012',
-      telefone2: '(11) 90000-1012',
-    }),
+      entrada: '2020-10-30',
+      nasc: '1994-10-16',
+      tel: '(11) 90000-0012',
+      tel2: '(11) 90000-1012',
+    },
   ]
+
+  return rows.map((r, i) =>
+    sample({
+      id: r.id,
+      nome: `Médium Exemplo ${String(i + 1).padStart(2, '0')}`,
+      paiDeCabeca: r.pai,
+      maeDeCabeca: r.mae,
+      guias: r.guias,
+      iniciacao: r.iniciacao,
+      dataEntrada: r.entrada,
+      dataNascimento: r.nasc,
+      telefone1: r.tel,
+      telefone2: r.tel2 ?? '',
+    }),
+  )
 }
 
 export function createInitialState(): AppState {

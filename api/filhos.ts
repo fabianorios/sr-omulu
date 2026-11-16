@@ -1,6 +1,23 @@
 import { requireIdentity } from '../cursor/identity'
 import { dbMode, json, sql, type FilhoRow } from '../lib/db'
 
+const PAIS = new Set(['Ogum', 'Omulu', 'Oxossi', 'Xango'])
+const MAES = new Set(['Iansã', 'Iemanjá', 'Nanã Buruquê', 'Oxum'])
+const GUIAS = new Set([
+  'Baiano',
+  'Boiadeiro',
+  'Caboclo',
+  'Cigano',
+  'Erê',
+  'Exu',
+  'Exu Mirim',
+  'Malandro',
+  'Marinheiro',
+  'Marujo',
+  'Pomba-Gira',
+  'Preto Velho',
+])
+
 export async function GET(request: Request): Promise<Response> {
   const identity = await requireIdentity(request)
   if (identity instanceof Response) return identity
@@ -30,13 +47,20 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const nome = String(body.nome ?? '').trim()
-  const orixa = String(body.orixa ?? '').trim()
-  if (!nome || !orixa) {
-    return json({ error: 'nome_and_orixa_required' }, 400)
+  const pai = String(body.paiDeCabeca ?? body.pai_de_cabeca ?? '').trim()
+  const mae = String(body.maeDeCabeca ?? body.mae_de_cabeca ?? '').trim()
+  if (!nome || !pai || !mae) {
+    return json({ error: 'nome_pai_mae_required' }, 400)
+  }
+  if (!PAIS.has(pai) || !MAES.has(mae)) {
+    return json({ error: 'invalid_pai_or_mae' }, 400)
   }
 
   const guias = Array.isArray(body.guias)
-    ? body.guias.map((g) => String(g).trim()).filter(Boolean)
+    ? body.guias
+        .map((g) => String(g).trim())
+        .filter((g) => GUIAS.has(g))
+        .sort((a, b) => a.localeCompare(b, 'pt-BR'))
     : []
 
   const endereco =
@@ -53,18 +77,17 @@ export async function POST(request: Request): Promise<Response> {
         endereco_cep, endereco_logradouro, endereco_numero,
         endereco_complemento, endereco_bairro, endereco_cidade, endereco_uf
       ) values (
-        $1,$2,$3,$4,$5::text[],
-        $6,$7,$8,
-        $9,$10,$11,
-        $12,$13,$14,
-        $15,$16,$17,$18
+        $1,'',$2,$3,$4::text[],
+        $5,$6,$7,
+        $8,$9,$10,
+        $11,$12,$13,
+        $14,$15,$16,$17
       )
       returning *`,
       [
         nome,
-        orixa,
-        emptyToNull(body.paiDeCabeca ?? body.pai_de_cabeca),
-        emptyToNull(body.maeDeCabeca ?? body.mae_de_cabeca),
+        pai,
+        mae,
         guias,
         emptyToNull(body.dataNascimento ?? body.data_nascimento),
         emptyToNull(body.dataEntrada ?? body.data_entrada),
