@@ -27,7 +27,18 @@ export type CobrancaRow = {
   pago_em: string | null
 }
 
-const LOCAL_KEY = 'sr-omulu.cobrancas.v1'
+const LOCAL_KEYS = ['sr-omulu.cobrancas.v1', 'sr-omulu.cobrancas.v0']
+
+/** Remove any leftover browser caches that held financeiro PII. */
+export function clearLocalCobrancasCache() {
+  for (const key of LOCAL_KEYS) {
+    try {
+      localStorage.removeItem(key)
+    } catch {
+      /* ignore */
+    }
+  }
+}
 
 function asCategoria(raw: string): CobrancaCategoria {
   if (raw === 'mensalidade' || raw === 'contribuicao' || raw === 'outro') {
@@ -85,6 +96,7 @@ export async function loadCobrancasFromApi(): Promise<
     }
   | { source: 'error'; cobrancas: Cobranca[]; tipos: CobrancaTipo[]; error: string }
 > {
+  clearLocalCobrancasCache()
   try {
     const res = await fetch('/api/cobrancas', { credentials: 'same-origin' })
     if (res.status === 401) {
@@ -208,17 +220,13 @@ export async function createCobrancaTipoViaApi(input: {
   }
 }
 
+/** No longer reads PII from localStorage; clears leftover keys. */
 export function loadLocalCobrancas(): Cobranca[] {
-  try {
-    const raw = localStorage.getItem(LOCAL_KEY)
-    if (!raw) return []
-    const parsed = JSON.parse(raw) as Cobranca[]
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
+  clearLocalCobrancasCache()
+  return []
 }
 
-export function saveLocalCobrancas(cobrancas: Cobranca[]) {
-  localStorage.setItem(LOCAL_KEY, JSON.stringify(cobrancas))
+/** No longer writes PII to localStorage; clears leftover keys. */
+export function saveLocalCobrancas(_cobrancas: Cobranca[]) {
+  clearLocalCobrancasCache()
 }

@@ -1,5 +1,6 @@
-import { Menu } from 'lucide-react'
+import { LogOut, Menu } from 'lucide-react'
 import { useApp } from '../context/AppContext'
+import { useAuth } from '../context/AuthContext'
 import { Logo } from './Logo'
 
 type HeaderProps = {
@@ -15,6 +16,7 @@ const SOURCE_LABEL = {
 
 export function Header({ onOpenMenu }: HeaderProps) {
   const { resetDemo, state } = useApp()
+  const { user, isAdmin, logout } = useAuth()
 
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-[var(--color-border-soft)] bg-[var(--color-cream)]/90 px-3 py-2.5 backdrop-blur-sm sm:gap-4 sm:px-6 sm:py-3">
@@ -42,20 +44,40 @@ export function Header({ onOpenMenu }: HeaderProps) {
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
+        {user ? (
+          <span className="hidden max-w-[140px] truncate text-xs text-[var(--color-ink-muted)] sm:inline">
+            {user.nome}
+            <span className="text-[var(--color-ink-faint)]">
+              {' '}
+              · {isAdmin ? 'Admin' : 'Médium'}
+            </span>
+          </span>
+        ) : null}
         <span
           className="hidden rounded border border-[var(--color-border)] bg-white/70 px-2 py-1 text-[10px] font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase sm:inline"
           title="Origem dos dados de filhos"
         >
           {SOURCE_LABEL[state.dataSource]}
         </span>
+        {isAdmin ? (
+          <button
+            type="button"
+            onClick={resetDemo}
+            className="rounded border border-[var(--color-forest)]/40 bg-[var(--color-forest)] px-2.5 py-1.5 text-[10px] font-semibold tracking-wide text-[var(--color-cream)] uppercase transition hover:bg-[var(--color-forest-hover)] sm:px-3 sm:text-[11px]"
+            title="Restaurar dados de exemplo"
+          >
+            <span className="sm:hidden">Exemplo</span>
+            <span className="hidden sm:inline">Dados de exemplo</span>
+          </button>
+        ) : null}
         <button
           type="button"
-          onClick={resetDemo}
-          className="rounded border border-[var(--color-forest)]/40 bg-[var(--color-forest)] px-2.5 py-1.5 text-[10px] font-semibold tracking-wide text-[var(--color-cream)] uppercase transition hover:bg-[var(--color-forest-hover)] sm:px-3 sm:text-[11px]"
-          title="Restaurar dados de exemplo"
+          onClick={() => void logout()}
+          className="inline-flex items-center gap-1 rounded border border-[var(--color-border)] bg-white/70 px-2 py-1.5 text-[10px] font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase hover:bg-[var(--color-parchment)] sm:text-[11px]"
+          title="Sair"
         >
-          <span className="sm:hidden">Exemplo</span>
-          <span className="hidden sm:inline">Dados de exemplo</span>
+          <LogOut size={12} />
+          Sair
         </button>
       </div>
     </header>

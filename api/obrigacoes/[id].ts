@@ -1,7 +1,13 @@
-import { requireIdentity } from '../../cursor/identity'
-import { dbMode, json, sql } from '../../lib/db'
+import {
+  canAccessFilho,
+  json,
+  requireAdmin,
+  requireAppSession,
+  sql,
+} from '../../lib/auth'
+import { dbMode } from '../../lib/db'
 
-type ObrigacaoRow = Record<string, unknown>
+type ObrigacaoRow = Record<string, unknown> & { filho_id?: string }
 
 function idFromUrl(request: Request): string | null {
   const parts = new URL(request.url).pathname.split('/').filter(Boolean)
@@ -27,8 +33,10 @@ function parseItens(raw: unknown) {
 }
 
 export async function PATCH(request: Request): Promise<Response> {
-  const identity = await requireIdentity(request)
-  if (identity instanceof Response) return identity
+  const session = await requireAppSession(request)
+  if (session instanceof Response) return session
+  const admin = requireAdmin(session)
+  if (admin instanceof Response) return admin
 
   const id = idFromUrl(request)
   if (!id) return json({ error: 'missing_id' }, 400)
@@ -48,7 +56,11 @@ export async function PATCH(request: Request): Promise<Response> {
   }
 
   if ('filhoId' in body || 'filho_id' in body) {
-    push('filho_id', String(body.filhoId ?? body.filho_id).trim())
+    const filhoId = String(body.filhoId ?? body.filho_id).trim()
+    if (!canAccessFilho(session, filhoId)) {
+      return json({ error: 'forbidden' }, 403)
+    }
+    push('filho_id', filhoId)
   }
   if ('tipoId' in body || 'tipo_id' in body) {
     push('tipo_id', String(body.tipoId ?? body.tipo_id).trim())
@@ -89,8 +101,10 @@ export async function PATCH(request: Request): Promise<Response> {
 }
 
 export async function DELETE(request: Request): Promise<Response> {
-  const identity = await requireIdentity(request)
-  if (identity instanceof Response) return identity
+  const session = await requireAppSession(request)
+  if (session instanceof Response) return session
+  const admin = requireAdmin(session)
+  if (admin instanceof Response) return admin
 
   const id = idFromUrl(request)
   if (!id) return json({ error: 'missing_id' }, 400)

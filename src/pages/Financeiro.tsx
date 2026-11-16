@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { CheckCircle2, Search, Wallet } from 'lucide-react'
 import { useApp } from '../context/AppContext'
+import { useAuth } from '../context/AuthContext'
 import {
   categoriaLabel,
   financeStatusLabel,
@@ -14,6 +15,7 @@ type Filter = 'todos' | FinanceStatus | 'mensalidade'
 
 export function Financeiro() {
   const { state, setOpenNovaCobranca, markCobrancaPago } = useApp()
+  const { isAdmin } = useAuth()
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<Filter>('todos')
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -87,14 +89,16 @@ export function Financeiro() {
             Marque pagamentos e acompanhe devedores.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setOpenNovaCobranca(true)}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-[var(--color-forest)] px-3.5 py-2 text-sm font-semibold text-[var(--color-cream)] hover:bg-[var(--color-forest-hover)]"
-        >
-          <Wallet size={16} />
-          + Nova cobrança
-        </button>
+        {isAdmin ? (
+          <button
+            type="button"
+            onClick={() => setOpenNovaCobranca(true)}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-[var(--color-forest)] px-3.5 py-2 text-sm font-semibold text-[var(--color-cream)] hover:bg-[var(--color-forest-hover)]"
+          >
+            <Wallet size={16} />
+            + Nova cobrança
+          </button>
+        ) : null}
       </div>
 
       <div className="animate-fade-in-delay-1 flex flex-col gap-3">

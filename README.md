@@ -23,9 +23,9 @@ npm run preview
 ## Database
 
 - Declare: `cursor-app.json` `{ "database": "postgres" }`
-- Migrations: `001`–`004` (filhos, entidades jsonb, financeiro, obrigações/itens)
+- Migrations: `001`–`005` (filhos, entidades jsonb, financeiro, obrigações/itens, auth)
 - Local API uses **PGlite** when `DATABASE_URL` is unset
-- Production DB is provisioned on **private/team publish** (platform sets `DATABASE_URL`)
+- Production DB is provisioned on publish when `cursor-app.json` declares database
 
 Do not commit or paste `DATABASE_URL`.
 
@@ -41,6 +41,28 @@ Cobranças por filho: **Mensalidade** (valor fixo + dia do mês 1–28 → venci
 
 Ao agendar/editar tipos, liste **itens** e **quantidade**. Persistidos em `obrigacoes.itens` (jsonb) e exibidos no histórico.
 
+## Autenticação e papéis (modelo público + login in-app)
+
+O app pode ser publicado como **público**. O host Cursor não exige login Cursor para abrir a URL; a proteção é o **login in-app** (CPF, e-mail ou celular + senha) com cookie HttpOnly `sr_omulu_sess`.
+
+| Papel | Acesso |
+|-------|--------|
+| **Administrador** | CRUD filhos, financeiro, obrigações, config, usuários |
+| **Médium** | Somente o próprio filho vinculado (`usuarios.filho_id`): cadastro, obrigações e cobranças; pode marcar pagamento próprio |
+
+APIs de dados exigem sessão de app (`requireAppSession`). Médiuns **não** listam tabelas inteiras — filtro por `filho_id` / ownership em GET, POST, PATCH e DELETE. Cadastro de usuários é só admin.
+
+Login tem throttle por IP+identificador (8 tentativas / 15 min). Cadastro e financeiro **não** são guardados em `localStorage`.
+
+### Bootstrap do primeiro admin
+
+Criar o primeiro administrador exige o segredo de instalação **`BOOTSTRAP_SECRET`** (body `bootstrapSecret` ou header `x-bootstrap-secret`). Sem o segredo o endpoint responde `503 bootstrap_unavailable`. Depois que **qualquer** linha `role=admin` existir, o endpoint fecha (`403 bootstrap_closed`) — desativar o último admin **não** reabre o bootstrap.
+
+- Publicado: declare o secret no host (`BOOTSTRAP_SECRET` via Cursor app secrets).
+- Local: `export BOOTSTRAP_SECRET=…` antes de `npm run dev`.
+
+Novos usuários depois do bootstrap: tela **Usuários** (só admin). Migration: `migrations/005_auth_usuarios.sql`.
+
 ## Publicação
 
-Não publique como público (PII). Quando for publicar, use **Private** ou **Team** — o Postgres da plataforma é criado nesse publish.
+Publicação **pública** é suportada com o modelo acima: sessão de app + papéis + ownership, não só identity do Cursor. Configure `BOOTSTRAP_SECRET` no host antes do primeiro acesso admin.

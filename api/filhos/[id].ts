@@ -1,5 +1,11 @@
-import { requireIdentity } from '../../cursor/identity'
-import { dbMode, json, sql, type FilhoRow } from '../../lib/db'
+import {
+  canAccessFilho,
+  json,
+  requireAdmin,
+  requireAppSession,
+  sql,
+} from '../../lib/auth'
+import { dbMode, type FilhoRow } from '../../lib/db'
 
 const PAIS = new Set(['Ogum', 'Omulu', 'Oxossi', 'Xango'])
 const MAES = new Set(['Iansã', 'Iemanjá', 'Nanã Buruquê', 'Oxum'])
@@ -41,11 +47,14 @@ function parseEntidades(body: Record<string, unknown>) {
 }
 
 export async function GET(request: Request): Promise<Response> {
-  const identity = await requireIdentity(request)
-  if (identity instanceof Response) return identity
+  const session = await requireAppSession(request)
+  if (session instanceof Response) return session
 
   const id = idFromUrl(request)
   if (!id) return json({ error: 'missing_id' }, 400)
+  if (!canAccessFilho(session, id)) {
+    return json({ error: 'forbidden' }, 403)
+  }
 
   try {
     const rows = await sql<FilhoRow>(`select * from filhos where id = $1`, [id])
@@ -60,11 +69,16 @@ export async function GET(request: Request): Promise<Response> {
 }
 
 export async function PATCH(request: Request): Promise<Response> {
-  const identity = await requireIdentity(request)
-  if (identity instanceof Response) return identity
+  const session = await requireAppSession(request)
+  if (session instanceof Response) return session
 
   const id = idFromUrl(request)
   if (!id) return json({ error: 'missing_id' }, 400)
+  if (!canAccessFilho(session, id)) {
+    return json({ error: 'forbidden' }, 403)
+  }
+  // Médium may update own contact fields only; admin full
+  const isAdmin = session.user.role === 'admin'
 
   let body: Record<string, unknown>
   try {
@@ -80,20 +94,20 @@ export async function PATCH(request: Request): Promise<Response> {
     sets.push(`${col} = $${params.length}`)
   }
 
-  if (body.nome != null) push('nome', String(body.nome).trim())
+  if (isAdmin && body.nome != null) push('nome', String(body.nome).trim())
 
-  if ('paiDeCabeca' in body || 'pai_de_cabeca' in body) {
+  if (isAdmin && ('paiDeCabeca' in body || 'pai_de_cabeca' in body)) {
     const pai = String(body.paiDeCabeca ?? body.pai_de_cabeca ?? '').trim()
     if (!PAIS.has(pai)) return json({ error: 'invalid_pai' }, 400)
     push('pai_de_cabeca', pai)
   }
-  if ('maeDeCabeca' in body || 'mae_de_cabeca' in body) {
+  if (isAdmin && ('maeDeCabeca' in body || 'mae_de_cabeca' in body)) {
     const mae = String(body.maeDeCabeca ?? body.mae_de_cabeca ?? '').trim()
     if (!MAES.has(mae)) return json({ error: 'invalid_mae' }, 400)
     push('mae_de_cabeca', mae)
   }
 
-  const entidades = parseEntidades(body)
+  const entidades = isAdmin ? parseEntidades(body) : null
   if (entidades) {
     params.push(JSON.stringify(entidades))
     sets.push(`entidades = $${params.length}::jsonb`)
@@ -101,16 +115,18 @@ export async function PATCH(request: Request): Promise<Response> {
     sets.push(`guias = $${params.length}::text[]`)
   }
 
-  if ('dataNascimento' in body || 'data_nascimento' in body) {
+  if (isAdmin && ('dataNascimento' in body || 'data_nascimento' in body)) {
     push(
       'data_nascimento',
       emptyToNull(body.dataNascimento ?? body.data_nascimento),
     )
   }
-  if ('dataEntrada' in body || 'data_entrada' in body) {
+  if (isAdmin && ('dataEntrada' in body || 'data_entrada' in body)) {
     push('data_entrada', emptyToNull(body.dataEntrada ?? body.data_entrada))
   }
-  if ('iniciacao' in body) push('iniciacao', emptyToNull(body.iniciacao))
+  if (isAdmin && 'iniciacao' in body) {
+    push('iniciacao', emptyToNull(body.iniciacao))
+  }
   if ('telefone1' in body || 'telefone' in body) {
     push('telefone1', emptyToNull(body.telefone1 ?? body.telefone))
   }
@@ -146,7 +162,7 @@ export async function PATCH(request: Request): Promise<Response> {
     push('endereco_uf', emptyToNull(endereco?.uf ?? body.endereco_uf))
   }
 
-  if ('paiDeCabeca' in body || 'maeDeCabeca' in body || entidades) {
+  if (isAdmin && ('paiDeCabeca' in body || 'maeDeCabeca' in body || entidades)) {
     push('orixa', '')
   }
 
@@ -171,8 +187,10 @@ export async function PATCH(request: Request): Promise<Response> {
 }
 
 export async function DELETE(request: Request): Promise<Response> {
-  const identity = await requireIdentity(request)
-  if (identity instanceof Response) return identity
+  const session = await requireAppSession(request)
+  if (session instanceof Response) return session
+  const admin = requireAdmin(session)
+  if (admin instanceof Response) return admin
 
   const id = idFromUrl(request)
   if (!id) return json({ error: 'missing_id' }, 400)

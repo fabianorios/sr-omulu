@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { History, Pencil, Search, UserPlus } from 'lucide-react'
 import { useApp } from '../context/AppContext'
+import { useAuth } from '../context/AuthContext'
 import { StatusBadge } from '../components/StatusBadge'
 import {
   formatBR,
@@ -17,6 +18,7 @@ export function Filhos() {
     setOpenNovoFilho,
     setEditingFilho,
   } = useApp()
+  const { isAdmin } = useAuth()
   const [query, setQuery] = useState('')
   const [detailId, setDetailId] = useState<string | null>(null)
 
@@ -75,17 +77,19 @@ export function Filhos() {
             endereço. Busque por nome, pai, mãe ou entidade.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            setEditingFilho(null)
-            setOpenNovoFilho(true)
-          }}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-[var(--color-forest)] px-3.5 py-2 text-sm font-semibold text-[var(--color-cream)] transition hover:bg-[var(--color-forest-hover)]"
-        >
-          <UserPlus size={16} />
-          + Novo Filho
-        </button>
+        {isAdmin ? (
+          <button
+            type="button"
+            onClick={() => {
+              setEditingFilho(null)
+              setOpenNovoFilho(true)
+            }}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-[var(--color-forest)] px-3.5 py-2 text-sm font-semibold text-[var(--color-cream)] transition hover:bg-[var(--color-forest-hover)]"
+          >
+            <UserPlus size={16} />
+            + Novo Filho
+          </button>
+        ) : null}
       </div>
 
       <div className="animate-fade-in-delay-1 relative">
