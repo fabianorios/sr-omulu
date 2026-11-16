@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Plugin } from 'vite'
 import { pathToFileURL } from 'node:url'
 import path from 'node:path'
+import { access } from 'node:fs/promises'
 
 type HandlerModule = {
   GET?: (req: Request) => Promise<Response> | Response
@@ -48,7 +49,6 @@ async function toWebRequest(
     method,
     headers,
     body: new Uint8Array(raw),
-    // Required by Node's undici when Request has a body
     duplex: 'half',
   } as RequestInit)
 }
@@ -65,6 +65,43 @@ async function writeWebResponse(
   res.end(buf)
 }
 
+async function resolveApiModule(
+  root: string,
+  urlPath: string,
+): Promise<string | null> {
+  const cleaned = urlPath.replace(/\/+$/, '') || '/'
+  if (!cleaned.startsWith('/api/')) return null
+  const rest = cleaned.slice('/api/'.length)
+  if (!rest) return null
+
+  const segments = rest.split('/').filter(Boolean)
+  // Exact collection: api/foo.ts
+  const exact = path.join(root, 'api', ...segments) + '.ts'
+  try {
+    await access(exact)
+    return exact
+  } catch {
+    /* try [id] */
+  }
+
+  // /api/foo/:id → api/foo/[id].ts
+  if (segments.length >= 2) {
+    const dyn = path.join(
+      root,
+      'api',
+      ...segments.slice(0, -1),
+      '[id].ts',
+    )
+    try {
+      await access(dyn)
+      return dyn
+    } catch {
+      return null
+    }
+  }
+  return null
+}
+
 export function apiDevPlugin(): Plugin {
   return {
     name: 'sr-omulu-api-dev',
@@ -74,17 +111,7 @@ export function apiDevPlugin(): Plugin {
           const urlPath = req.url?.split('?')[0] ?? ''
           if (!urlPath.startsWith('/api/')) return next()
 
-          const root = server.config.root
-          let modPath: string | null = null
-          if (urlPath === '/api/filhos' || urlPath === '/api/filhos/') {
-            modPath = path.join(root, 'api/filhos.ts')
-          } else {
-            const match = urlPath.match(/^\/api\/filhos\/([^/]+)\/?$/)
-            if (match) {
-              modPath = path.join(root, 'api/filhos/[id].ts')
-            }
-          }
-
+          const modPath = await resolveApiModule(server.config.root, urlPath)
           if (!modPath) return next()
 
           const href = pathToFileURL(modPath).href + `?t=${Date.now()}`

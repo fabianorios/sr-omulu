@@ -18,6 +18,8 @@ export interface ObligationType {
   isFestiva?: boolean
   color: string
   active: boolean
+  /** Itens sugeridos ao agendar este tipo. */
+  itensPadrao?: ObrigacaoItem[]
 }
 
 export interface Endereco {
@@ -53,12 +55,51 @@ export interface Filho {
 
 export type FilhoInput = Omit<Filho, 'id'> & { id?: string }
 
+export interface ObrigacaoItem {
+  nome: string
+  quantidade: number
+}
+
 export interface Obrigacao {
   id: string
   filhoId: string
   tipoId: ObligationTypeId
   data: string
   ultimaData?: string
+  itens: ObrigacaoItem[]
+}
+
+export type CobrancaCategoria = 'mensalidade' | 'contribuicao' | 'outro'
+
+export type FinanceStatus = 'pago' | 'aberto' | 'vencido'
+
+export interface CobrancaTipo {
+  id: string
+  nome: string
+  categoria: CobrancaCategoria
+  ativo: boolean
+}
+
+export interface Cobranca {
+  id: string
+  filhoId: string
+  tipoId?: string
+  tipoNome: string
+  categoria: CobrancaCategoria
+  valor: number
+  vencimento: string
+  /** Dia do mês (1–28) para mensalidades recorrentes. */
+  diaVencimento?: number
+  referencia?: string
+  descricao?: string
+  pago: boolean
+  pagoEm?: string
+}
+
+export type CobrancaInput = Omit<Cobranca, 'id' | 'pago' | 'pagoEm'> & {
+  id?: string
+  pago?: boolean
+  pagoEm?: string
 }
 
 export interface HouseEvent {
@@ -75,7 +116,18 @@ export interface AppState {
   obrigacoes: Obrigacao[]
   eventos: HouseEvent[]
   tipos: ObligationType[]
+  cobrancas: Cobranca[]
+  cobrancaTipos: CobrancaTipo[]
   dataSource: DataSource
+}
+
+export function emptyObrigacaoItem(): ObrigacaoItem {
+  return { nome: '', quantidade: 1 }
+}
+
+export function formatObrigacaoItem(item: ObrigacaoItem): string {
+  const q = Number.isFinite(item.quantidade) ? item.quantidade : 0
+  return `${item.nome.trim() || 'Item'} × ${q}`
 }
 
 export function emptyEndereco(): Endereco {

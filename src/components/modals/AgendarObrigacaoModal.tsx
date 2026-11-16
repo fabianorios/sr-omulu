@@ -1,7 +1,8 @@
-import { useMemo, useState, type FormEvent } from 'react'
-import { CalendarPlus, X } from 'lucide-react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { CalendarPlus, Plus, Trash2, X } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
-import type { ObligationTypeId } from '../../types'
+import type { ObligationTypeId, ObrigacaoItem } from '../../types'
+import { emptyObrigacaoItem } from '../../types'
 import { calculateNextDate, formatBR } from '../../utils/status'
 
 export function AgendarObrigacaoModal({ onClose }: { onClose: () => void }) {
@@ -15,11 +16,23 @@ export function AgendarObrigacaoModal({ onClose }: { onClose: () => void }) {
   const [ultimaData, setUltimaData] = useState('')
   const [proximaData, setProximaData] = useState('')
   const [calcMsg, setCalcMsg] = useState('')
+  const [itens, setItens] = useState<ObrigacaoItem[]>([emptyObrigacaoItem()])
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
   const tipo = useMemo(
     () => state.tipos.find((t) => t.id === tipoId),
     [state.tipos, tipoId],
   )
+
+  useEffect(() => {
+    const padrao = tipo?.itensPadrao
+    if (padrao && padrao.length > 0) {
+      setItens(padrao.map((i) => ({ ...i })))
+    } else {
+      setItens([emptyObrigacaoItem()])
+    }
+  }, [tipoId, tipo?.itensPadrao])
 
   function handleCalcular() {
     if (!tipo || !ultimaData) {
@@ -38,16 +51,37 @@ export function AgendarObrigacaoModal({ onClose }: { onClose: () => void }) {
     setCalcMsg(`Próxima data calculada: ${formatBR(next)}`)
   }
 
-  function handleSubmit(e: FormEvent) {
+  function updateItem(index: number, patch: Partial<ObrigacaoItem>) {
+    setItens((prev) =>
+      prev.map((row, i) => (i === index ? { ...row, ...patch } : row)),
+    )
+  }
+
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    setError('')
     const data = proximaData || ultimaData
     if (!filhoId || !tipoId || !data) return
-    addObrigacao({
+    const cleanItens = itens
+      .map((i) => ({
+        nome: i.nome.trim(),
+        quantidade: Number(i.quantidade) > 0 ? Number(i.quantidade) : 1,
+      }))
+      .filter((i) => i.nome)
+
+    setSaving(true)
+    const result = await addObrigacao({
       filhoId,
       tipoId,
       data,
       ultimaData: ultimaData || undefined,
+      itens: cleanItens,
     })
+    setSaving(false)
+    if (!result.ok) {
+      setError(result.error ?? 'Não foi possível agendar.')
+      return
+    }
     onClose()
   }
 
@@ -145,7 +179,10 @@ export function AgendarObrigacaoModal({ onClose }: { onClose: () => void }) {
             </button>
             {proximaData && (
               <span className="text-sm text-[var(--color-ink-muted)]">
-                Agendar em: <strong className="text-[var(--color-ink)]">{formatBR(proximaData)}</strong>
+                Agendar em:{' '}
+                <strong className="text-[var(--color-ink)]">
+                  {formatBR(proximaData)}
+                </strong>
               </span>
             )}
           </div>
@@ -167,6 +204,64 @@ export function AgendarObrigacaoModal({ onClose }: { onClose: () => void }) {
             />
           </label>
 
+          <section className="space-y-2">
+            <h3 className="text-xs font-semibold tracking-[0.14em] text-[var(--color-tan)] uppercase">
+              Itens da obrigação
+            </h3>
+            {itens.map((item, index) => (
+              <div
+                key={`item-${index}`}
+                className="grid grid-cols-[1fr_5.5rem_auto] gap-2"
+              >
+                <input
+                  value={item.nome}
+                  onChange={(e) => updateItem(index, { nome: e.target.value })}
+                  placeholder="Item"
+                  className="rounded-md border border-[var(--color-border)] bg-white px-3 py-2 text-sm"
+                />
+                <input
+                  type="number"
+                  min={1}
+                  value={item.quantidade}
+                  onChange={(e) =>
+                    updateItem(index, {
+                      quantidade: Number(e.target.value) || 1,
+                    })
+                  }
+                  className="rounded-md border border-[var(--color-border)] bg-white px-3 py-2 text-sm"
+                  aria-label={`Quantidade do item ${index + 1}`}
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    setItens((prev) => {
+                      const next = prev.filter((_, i) => i !== index)
+                      return next.length ? next : [emptyObrigacaoItem()]
+                    })
+                  }
+                  className="inline-flex h-[38px] w-[38px] items-center justify-center rounded-md border border-[var(--color-border)] text-[var(--color-ink-muted)] hover:bg-[var(--color-parchment)]"
+                  aria-label={`Remover item ${index + 1}`}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => setItens((prev) => [...prev, emptyObrigacaoItem()])}
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--color-forest)]"
+            >
+              <Plus size={14} />
+              Adicionar item
+            </button>
+          </section>
+
+          {error ? (
+            <p className="text-sm text-[var(--color-status-vencida-fg)]">
+              {error}
+            </p>
+          ) : null}
+
           <div className="flex items-center justify-end gap-3 pt-2">
             <button
               type="button"
@@ -177,7 +272,8 @@ export function AgendarObrigacaoModal({ onClose }: { onClose: () => void }) {
             </button>
             <button
               type="submit"
-              className="rounded-md bg-[var(--color-forest)] px-4 py-2 text-sm font-semibold text-[var(--color-cream)] hover:bg-[var(--color-forest-hover)]"
+              disabled={saving}
+              className="rounded-md bg-[var(--color-forest)] px-4 py-2 text-sm font-semibold text-[var(--color-cream)] hover:bg-[var(--color-forest-hover)] disabled:opacity-60"
             >
               Agendar
             </button>

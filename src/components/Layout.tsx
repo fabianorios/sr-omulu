@@ -5,15 +5,18 @@ import { Header } from './Header'
 import { Sidebar } from './Sidebar'
 import { NovoFilhoModal } from './modals/NovoFilhoModal'
 import { AgendarObrigacaoModal } from './modals/AgendarObrigacaoModal'
+import { NovaCobrancaModal } from './modals/NovaCobrancaModal'
 
 export function Layout() {
   const {
     openNovoFilho,
     editingFilho,
     openAgendar,
+    openNovaCobranca,
     setOpenNovoFilho,
     setEditingFilho,
     setOpenAgendar,
+    setOpenNovaCobranca,
   } = useApp()
   const [menuOpen, setMenuOpen] = useState(false)
   const location = useLocation()
@@ -62,6 +65,9 @@ export function Layout() {
       )}
       {openAgendar && (
         <AgendarObrigacaoModal onClose={() => setOpenAgendar(false)} />
+      )}
+      {openNovaCobranca && (
+        <NovaCobrancaModal onClose={() => setOpenNovaCobranca(false)} />
       )}
     </div>
   )

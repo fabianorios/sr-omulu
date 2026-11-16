@@ -1,4 +1,12 @@
-import type { AppState, EntidadeLinha, Filho, ObligationType } from '../types'
+import type {
+  AppState,
+  Cobranca,
+  CobrancaTipo,
+  EntidadeLinha,
+  Filho,
+  ObligationType,
+  Obrigacao,
+} from '../types'
 import { emptyEndereco } from '../types'
 import type { MaeDeCabeca, PaiDeCabeca, TipoEntidade } from './catalog'
 
@@ -10,6 +18,10 @@ export const DEFAULT_TIPOS: ObligationType[] = [
     yearsOffset: 1,
     color: '#3B6EA5',
     active: true,
+    itensPadrao: [
+      { nome: 'Vela branca', quantidade: 2 },
+      { nome: 'Flor', quantidade: 1 },
+    ],
   },
   {
     id: '3_anos',
@@ -18,6 +30,7 @@ export const DEFAULT_TIPOS: ObligationType[] = [
     yearsOffset: 3,
     color: '#1E4D7B',
     active: true,
+    itensPadrao: [{ nome: 'Vela', quantidade: 3 }],
   },
   {
     id: '7_anos',
@@ -34,6 +47,10 @@ export const DEFAULT_TIPOS: ObligationType[] = [
     yearsOffset: null,
     color: '#7BA3C4',
     active: true,
+    itensPadrao: [
+      { nome: 'Kit de feitura', quantidade: 1 },
+      { nome: 'Contas', quantidade: 1 },
+    ],
   },
   {
     id: 'troca_guia',
@@ -42,6 +59,7 @@ export const DEFAULT_TIPOS: ObligationType[] = [
     yearsOffset: null,
     color: '#C4A35A',
     active: true,
+    itensPadrao: [{ nome: 'Guia', quantidade: 1 }],
   },
   {
     id: 'festiva',
@@ -51,6 +69,37 @@ export const DEFAULT_TIPOS: ObligationType[] = [
     isFestiva: true,
     color: '#8B9A7D',
     active: true,
+    itensPadrao: [
+      { nome: 'Contribuição de mesa', quantidade: 1 },
+      { nome: 'Flor', quantidade: 3 },
+    ],
+  },
+]
+
+export const DEFAULT_COBRANCA_TIPOS: CobrancaTipo[] = [
+  {
+    id: 'ct_mensalidade',
+    nome: 'Mensalidade do filho',
+    categoria: 'mensalidade',
+    ativo: true,
+  },
+  {
+    id: 'ct_festiva',
+    nome: 'Contribuição festiva',
+    categoria: 'contribuicao',
+    ativo: true,
+  },
+  {
+    id: 'ct_obrigacao',
+    nome: 'Contribuição de obrigação',
+    categoria: 'contribuicao',
+    ativo: true,
+  },
+  {
+    id: 'ct_outra',
+    nome: 'Outra contribuição',
+    categoria: 'outro',
+    ativo: true,
   },
 ]
 
@@ -235,26 +284,214 @@ export function createSampleFilhos(): Filho[] {
   )
 }
 
+function withItens(
+  o: Omit<Obrigacao, 'itens'> & { itens?: Obrigacao['itens'] },
+): Obrigacao {
+  return { ...o, itens: o.itens ?? [] }
+}
+
+export function createSampleCobrancas(): Cobranca[] {
+  return [
+    {
+      id: 'c1',
+      filhoId: 'f1',
+      tipoId: 'ct_mensalidade',
+      tipoNome: 'Mensalidade do filho',
+      categoria: 'mensalidade',
+      valor: 80,
+      vencimento: '2026-11-05',
+      diaVencimento: 5,
+      referencia: '2026-11',
+      pago: false,
+    },
+    {
+      id: 'c2',
+      filhoId: 'f2',
+      tipoId: 'ct_mensalidade',
+      tipoNome: 'Mensalidade do filho',
+      categoria: 'mensalidade',
+      valor: 80,
+      vencimento: '2026-11-10',
+      diaVencimento: 10,
+      referencia: '2026-11',
+      pago: false,
+    },
+    {
+      id: 'c3',
+      filhoId: 'f3',
+      tipoId: 'ct_mensalidade',
+      tipoNome: 'Mensalidade do filho',
+      categoria: 'mensalidade',
+      valor: 80,
+      vencimento: '2026-11-20',
+      diaVencimento: 20,
+      referencia: '2026-11',
+      pago: true,
+      pagoEm: '2026-11-12T12:00:00.000Z',
+    },
+    {
+      id: 'c4',
+      filhoId: 'f5',
+      tipoId: 'ct_festiva',
+      tipoNome: 'Contribuição festiva',
+      categoria: 'contribuicao',
+      valor: 50,
+      vencimento: '2026-11-18',
+      descricao: 'Festa / troca de guia',
+      pago: false,
+    },
+    {
+      id: 'c5',
+      filhoId: 'f6',
+      tipoId: 'ct_mensalidade',
+      tipoNome: 'Mensalidade do filho',
+      categoria: 'mensalidade',
+      valor: 80,
+      vencimento: '2026-10-10',
+      diaVencimento: 10,
+      referencia: '2026-10',
+      pago: false,
+    },
+    {
+      id: 'c6',
+      filhoId: 'f12',
+      tipoId: 'ct_obrigacao',
+      tipoNome: 'Contribuição de obrigação',
+      categoria: 'contribuicao',
+      valor: 120,
+      vencimento: '2026-11-23',
+      descricao: 'Troca de guia',
+      pago: false,
+    },
+  ]
+}
+
 export function createInitialState(): AppState {
   return {
     dataSource: 'sample',
-    tipos: DEFAULT_TIPOS.map((t) => ({ ...t })),
+    tipos: DEFAULT_TIPOS.map((t) => ({
+      ...t,
+      itensPadrao: t.itensPadrao?.map((i) => ({ ...i })),
+    })),
     filhos: createSampleFilhos(),
+    cobrancaTipos: DEFAULT_COBRANCA_TIPOS.map((t) => ({ ...t })),
+    cobrancas: createSampleCobrancas(),
     obrigacoes: [
-      { id: 'o1', filhoId: 'f6', tipoId: '1_ano', data: '2026-10-30', ultimaData: '2025-10-30' },
-      { id: 'o2', filhoId: 'f9', tipoId: '7_anos', data: '2026-11-05', ultimaData: '2019-11-05' },
-      { id: 'o3', filhoId: 'f2', tipoId: '3_anos', data: '2026-11-08', ultimaData: '2023-11-08' },
-      { id: 'o4', filhoId: 'f5', tipoId: 'troca_guia', data: '2026-11-18' },
-      { id: 'o5', filhoId: 'f1', tipoId: '1_ano', data: '2026-11-20', ultimaData: '2025-11-20' },
-      { id: 'o6', filhoId: 'f11', tipoId: '1_ano', data: '2026-11-25', ultimaData: '2025-11-25' },
-      { id: 'o7', filhoId: 'f4', tipoId: '7_anos', data: '2026-11-28', ultimaData: '2019-11-28' },
-      { id: 'o8', filhoId: 'f3', tipoId: '1_ano', data: '2026-12-02', ultimaData: '2025-12-02' },
-      { id: 'o9', filhoId: 'f7', tipoId: '1_ano', data: '2026-12-12', ultimaData: '2025-12-12' },
-      { id: 'o10', filhoId: 'f8', tipoId: '1_ano', data: '2027-01-15', ultimaData: '2026-01-15' },
-      { id: 'o11', filhoId: 'f10', tipoId: 'feitura', data: '2027-04-07' },
-      { id: 'o12', filhoId: 'f12', tipoId: 'festiva', data: '2026-11-20', ultimaData: '2025-11-20' },
-      { id: 'o13', filhoId: 'f5', tipoId: 'troca_guia', data: '2026-11-19' },
-      { id: 'o14', filhoId: 'f12', tipoId: 'troca_guia', data: '2026-11-23' },
+      withItens({
+        id: 'o1',
+        filhoId: 'f6',
+        tipoId: '1_ano',
+        data: '2026-10-30',
+        ultimaData: '2025-10-30',
+        itens: [
+          { nome: 'Vela branca', quantidade: 2 },
+          { nome: 'Flor', quantidade: 1 },
+        ],
+      }),
+      withItens({
+        id: 'o2',
+        filhoId: 'f9',
+        tipoId: '7_anos',
+        data: '2026-11-05',
+        ultimaData: '2019-11-05',
+        itens: [{ nome: 'Vela', quantidade: 7 }],
+      }),
+      withItens({
+        id: 'o3',
+        filhoId: 'f2',
+        tipoId: '3_anos',
+        data: '2026-11-08',
+        ultimaData: '2023-11-08',
+        itens: [{ nome: 'Vela', quantidade: 3 }],
+      }),
+      withItens({
+        id: 'o4',
+        filhoId: 'f5',
+        tipoId: 'troca_guia',
+        data: '2026-11-18',
+        itens: [{ nome: 'Guia', quantidade: 1 }],
+      }),
+      withItens({
+        id: 'o5',
+        filhoId: 'f1',
+        tipoId: '1_ano',
+        data: '2026-11-20',
+        ultimaData: '2025-11-20',
+        itens: [
+          { nome: 'Vela branca', quantidade: 2 },
+          { nome: 'Flor', quantidade: 1 },
+        ],
+      }),
+      withItens({
+        id: 'o6',
+        filhoId: 'f11',
+        tipoId: '1_ano',
+        data: '2026-11-25',
+        ultimaData: '2025-11-25',
+      }),
+      withItens({
+        id: 'o7',
+        filhoId: 'f4',
+        tipoId: '7_anos',
+        data: '2026-11-28',
+        ultimaData: '2019-11-28',
+      }),
+      withItens({
+        id: 'o8',
+        filhoId: 'f3',
+        tipoId: '1_ano',
+        data: '2026-12-02',
+        ultimaData: '2025-12-02',
+      }),
+      withItens({
+        id: 'o9',
+        filhoId: 'f7',
+        tipoId: '1_ano',
+        data: '2026-12-12',
+        ultimaData: '2025-12-12',
+      }),
+      withItens({
+        id: 'o10',
+        filhoId: 'f8',
+        tipoId: '1_ano',
+        data: '2027-01-15',
+        ultimaData: '2026-01-15',
+      }),
+      withItens({
+        id: 'o11',
+        filhoId: 'f10',
+        tipoId: 'feitura',
+        data: '2027-04-07',
+        itens: [
+          { nome: 'Kit de feitura', quantidade: 1 },
+          { nome: 'Contas', quantidade: 1 },
+        ],
+      }),
+      withItens({
+        id: 'o12',
+        filhoId: 'f12',
+        tipoId: 'festiva',
+        data: '2026-11-20',
+        ultimaData: '2025-11-20',
+        itens: [
+          { nome: 'Contribuição de mesa', quantidade: 1 },
+          { nome: 'Flor', quantidade: 3 },
+        ],
+      }),
+      withItens({
+        id: 'o13',
+        filhoId: 'f5',
+        tipoId: 'troca_guia',
+        data: '2026-11-19',
+        itens: [{ nome: 'Guia', quantidade: 1 }],
+      }),
+      withItens({
+        id: 'o14',
+        filhoId: 'f12',
+        tipoId: 'troca_guia',
+        data: '2026-11-23',
+        itens: [{ nome: 'Guia', quantidade: 1 }],
+      }),
     ],
     eventos: [
       { id: 'e1', titulo: 'Gira de Desenvolvimento', data: '2026-11-16', tipo: 'gira' },
