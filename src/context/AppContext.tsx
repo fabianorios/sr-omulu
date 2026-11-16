@@ -13,6 +13,7 @@ import {
   loadFilhosFromApi,
   loadLocalFilhos,
   saveLocalFilhos,
+  updateFilhoViaApi,
 } from '../lib/filhosApi'
 import type {
   AppState,
@@ -28,12 +29,18 @@ interface AppContextValue {
   loadingFilhos: boolean
   resetDemo: () => void
   addFilho: (filho: FilhoInput) => Promise<{ ok: boolean; error?: string }>
+  updateFilho: (
+    id: string,
+    filho: FilhoInput,
+  ) => Promise<{ ok: boolean; error?: string }>
   addObrigacao: (obrigacao: Omit<Obrigacao, 'id'> & { id?: string }) => void
   toggleTipo: (id: ObligationTypeId) => void
   updateTipo: (id: ObligationTypeId, patch: Partial<ObligationType>) => void
   openNovoFilho: boolean
+  editingFilho: Filho | null
   openAgendar: boolean
   setOpenNovoFilho: (v: boolean) => void
+  setEditingFilho: (filho: Filho | null) => void
   setOpenAgendar: (v: boolean) => void
 }
 
@@ -43,10 +50,19 @@ function uid(prefix: string): string {
   return `${prefix}_${Math.random().toString(36).slice(2, 9)}`
 }
 
+function applyLocalUpdate(
+  list: Filho[],
+  id: string,
+  patch: FilhoInput,
+): Filho[] {
+  return list.map((f) => (f.id === id ? { ...f, ...patch, id } : f))
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AppState>(() => createInitialState())
   const [loadingFilhos, setLoadingFilhos] = useState(true)
   const [openNovoFilho, setOpenNovoFilho] = useState(false)
+  const [editingFilho, setEditingFilho] = useState<Filho | null>(null)
   const [openAgendar, setOpenAgendar] = useState(false)
 
   useEffect(() => {
@@ -124,6 +140,43 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return { ok: false, error: err }
   }, [])
 
+  const updateFilho = useCallback(async (id: string, filho: FilhoInput) => {
+    const remote = await updateFilhoViaApi(id, filho)
+    if (remote.ok === true) {
+      setState((prev) => ({
+        ...prev,
+        filhos: prev.filhos.map((f) => (f.id === id ? remote.filho : f)),
+        dataSource: remote.source,
+      }))
+      return { ok: true }
+    }
+
+    // Sample/local ids (f1…) or offline: update in memory
+    if (
+      remote.error === 'not_found' ||
+      remote.error === 'network' ||
+      remote.error.startsWith('http_')
+    ) {
+      setState((prev) => {
+        const filhos = applyLocalUpdate(prev.filhos, id, filho)
+        if (prev.dataSource === 'local' || prev.dataSource === 'sample') {
+          saveLocalFilhos(filhos)
+        }
+        return {
+          ...prev,
+          filhos,
+          dataSource:
+            prev.dataSource === 'postgres' || prev.dataSource === 'pglite'
+              ? prev.dataSource
+              : 'local',
+        }
+      })
+      return { ok: true }
+    }
+
+    return { ok: false, error: remote.error }
+  }, [])
+
   const addObrigacao = useCallback(
     (obrigacao: Omit<Obrigacao, 'id'> & { id?: string }) => {
       setState((prev) => ({
@@ -162,12 +215,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       loadingFilhos,
       resetDemo,
       addFilho,
+      updateFilho,
       addObrigacao,
       toggleTipo,
       updateTipo,
       openNovoFilho,
+      editingFilho,
       openAgendar,
       setOpenNovoFilho,
+      setEditingFilho,
       setOpenAgendar,
     }),
     [
@@ -175,10 +231,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       loadingFilhos,
       resetDemo,
       addFilho,
+      updateFilho,
       addObrigacao,
       toggleTipo,
       updateTipo,
       openNovoFilho,
+      editingFilho,
       openAgendar,
     ],
   )

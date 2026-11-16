@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { History, Search } from 'lucide-react'
+import { History, Pencil, Search, UserPlus } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { StatusBadge } from '../components/StatusBadge'
 import {
@@ -7,9 +7,15 @@ import {
   getStatus,
   nextObligationForFilho,
 } from '../utils/status'
+import type { Filho } from '../types'
 
 export function Filhos() {
-  const { state, loadingFilhos } = useApp()
+  const {
+    state,
+    loadingFilhos,
+    setOpenNovoFilho,
+    setEditingFilho,
+  } = useApp()
   const [query, setQuery] = useState('')
   const [detailId, setDetailId] = useState<string | null>(null)
 
@@ -29,6 +35,7 @@ export function Filhos() {
           f.paiDeCabeca,
           f.maeDeCabeca,
           ...f.guias,
+          f.endereco.cidade,
         ]
           .join(' ')
           .toLowerCase()
@@ -40,10 +47,9 @@ export function Filhos() {
           filho,
           obr,
           status: obr ? getStatus(obr.data) : null,
-          tipo: obr ? tipoMap.get(obr.tipoId) : null,
         }
       })
-  }, [state.filhos, state.obrigacoes, query, tipoMap])
+  }, [state.filhos, state.obrigacoes, query])
 
   const detailFilho = state.filhos.find((f) => f.id === detailId)
   const detailHistory = detailId
@@ -52,16 +58,34 @@ export function Filhos() {
         .sort((a, b) => a.data.localeCompare(b.data))
     : []
 
+  function openEdit(filho: Filho) {
+    setDetailId(null)
+    setEditingFilho(filho)
+  }
+
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <div className="animate-fade-in">
-        <h2 className="font-serif text-2xl font-semibold text-[var(--color-forest)] sm:text-3xl md:text-4xl">
-          Lista de Filhos
-        </h2>
-        <p className="mt-2 text-sm text-[var(--color-ink-muted)]">
-          Busque por nome, Orixá ou guia. Consulte o histórico detalhado de cada
-          filho.
-        </p>
+      <div className="animate-fade-in flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="font-serif text-2xl font-semibold text-[var(--color-forest)] sm:text-3xl md:text-4xl">
+            Lista de Filhos
+          </h2>
+          <p className="mt-2 text-sm text-[var(--color-ink-muted)]">
+            Cadastro completo: pai/mãe de cabeça, guias, datas, telefones e
+            endereço. Busque por nome, Orixá ou guia.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setEditingFilho(null)
+            setOpenNovoFilho(true)
+          }}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-[var(--color-forest)] px-3.5 py-2 text-sm font-semibold text-[var(--color-cream)] transition hover:bg-[var(--color-forest-hover)]"
+        >
+          <UserPlus size={16} />
+          + Novo Filho
+        </button>
       </div>
 
       <div className="animate-fade-in-delay-1 relative">
@@ -72,7 +96,7 @@ export function Filhos() {
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar por nome, Orixá ou guia..."
+          placeholder="Buscar por nome, Orixá, guia ou cidade..."
           className="w-full rounded-md border border-[var(--color-border)] bg-white/80 py-2.5 pr-4 pl-10 text-sm outline-none focus:border-[var(--color-forest)] focus:ring-2 focus:ring-[var(--color-forest)]/15"
         />
       </div>
@@ -97,6 +121,11 @@ export function Filhos() {
                   {filho.paiDeCabeca ? ` · Pai ${filho.paiDeCabeca}` : ''}
                   {filho.maeDeCabeca ? ` · Mãe ${filho.maeDeCabeca}` : ''}
                 </p>
+                {filho.guias.length > 0 ? (
+                  <p className="mt-1 text-xs text-[var(--color-ink-faint)]">
+                    Guias: {filho.guias.join(', ')}
+                  </p>
+                ) : null}
               </div>
               {status && obr ? (
                 <div className="flex shrink-0 flex-col items-end gap-1">
@@ -109,36 +138,60 @@ export function Filhos() {
             </div>
             <dl className="mt-3 space-y-1 text-sm text-[var(--color-ink-muted)]">
               <div className="flex justify-between gap-3">
+                <dt className="text-[var(--color-ink-faint)]">Entrada</dt>
+                <dd>{formatBR(filho.dataEntrada)}</dd>
+              </div>
+              <div className="flex justify-between gap-3">
                 <dt className="text-[var(--color-ink-faint)]">Iniciação</dt>
                 <dd>{formatBR(filho.iniciacao)}</dd>
               </div>
               <div className="flex justify-between gap-3">
                 <dt className="text-[var(--color-ink-faint)]">WhatsApp</dt>
-                <dd>{filho.telefone1}</dd>
+                <dd>{filho.telefone1 || '—'}</dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-[var(--color-ink-faint)]">Cidade</dt>
+                <dd>
+                  {[filho.endereco.cidade, filho.endereco.uf]
+                    .filter(Boolean)
+                    .join('/') || '—'}
+                </dd>
               </div>
             </dl>
-            <button
-              type="button"
-              onClick={() => setDetailId(filho.id)}
-              className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded border border-[var(--color-border)] bg-white/70 px-2.5 py-2 text-xs font-medium text-[var(--color-forest)] hover:bg-[var(--color-parchment)]"
-            >
-              <History size={13} />
-              Detalhes
-            </button>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => openEdit(filho)}
+                className="inline-flex items-center justify-center gap-1.5 rounded border border-[var(--color-border)] bg-white/70 px-2.5 py-2 text-xs font-medium text-[var(--color-forest)] hover:bg-[var(--color-parchment)]"
+              >
+                <Pencil size={13} />
+                Editar
+              </button>
+              <button
+                type="button"
+                onClick={() => setDetailId(filho.id)}
+                className="inline-flex items-center justify-center gap-1.5 rounded border border-[var(--color-border)] bg-white/70 px-2.5 py-2 text-xs font-medium text-[var(--color-forest)] hover:bg-[var(--color-parchment)]"
+              >
+                <History size={13} />
+                Histórico
+              </button>
+            </div>
           </article>
         ))}
       </div>
 
       <div className="animate-fade-in-delay-2 hidden overflow-x-auto rounded-lg border border-[var(--color-border)] bg-[var(--color-cream)]/80 shadow-sm md:block">
-        <table className="w-full min-w-[980px] border-collapse text-left text-sm">
+        <table className="w-full min-w-[1100px] border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-[var(--color-border-soft)] text-[11px] tracking-wide text-[var(--color-ink-faint)] uppercase">
               <th className="px-4 py-3 font-semibold">Nome</th>
               <th className="px-4 py-3 font-semibold">Orixá / Pai / Mãe</th>
-              <th className="px-4 py-3 font-semibold">Iniciação</th>
+              <th className="px-4 py-3 font-semibold">Guias</th>
+              <th className="px-4 py-3 font-semibold">Datas</th>
               <th className="px-4 py-3 font-semibold">Telefones</th>
+              <th className="px-4 py-3 font-semibold">Cidade</th>
               <th className="px-4 py-3 font-semibold">Status</th>
-              <th className="px-4 py-3 font-semibold">Histórico</th>
+              <th className="px-4 py-3 font-semibold">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--color-border-soft)]">
@@ -150,11 +203,17 @@ export function Filhos() {
                 <td className="px-4 py-3.5 text-[var(--color-ink-muted)]">
                   <div>{filho.orixa}</div>
                   <div className="text-xs text-[var(--color-ink-faint)]">
-                    Pai {filho.paiDeCabeca || '—'} · Mãe {filho.maeDeCabeca || '—'}
+                    Pai {filho.paiDeCabeca || '—'} · Mãe{' '}
+                    {filho.maeDeCabeca || '—'}
                   </div>
                 </td>
-                <td className="px-4 py-3.5 text-[var(--color-ink-muted)]">
-                  {formatBR(filho.iniciacao)}
+                <td className="max-w-[160px] px-4 py-3.5 text-xs text-[var(--color-ink-muted)]">
+                  {filho.guias.length ? filho.guias.join(', ') : '—'}
+                </td>
+                <td className="px-4 py-3.5 text-xs text-[var(--color-ink-muted)]">
+                  <div>Nasc. {formatBR(filho.dataNascimento)}</div>
+                  <div>Entr. {formatBR(filho.dataEntrada)}</div>
+                  <div>Inic. {formatBR(filho.iniciacao)}</div>
                 </td>
                 <td className="px-4 py-3.5 text-[var(--color-ink-muted)]">
                   <div>{filho.telefone1 || '—'}</div>
@@ -163,6 +222,11 @@ export function Filhos() {
                       {filho.telefone2}
                     </div>
                   ) : null}
+                </td>
+                <td className="px-4 py-3.5 text-[var(--color-ink-muted)]">
+                  {[filho.endereco.cidade, filho.endereco.uf]
+                    .filter(Boolean)
+                    .join('/') || '—'}
                 </td>
                 <td className="px-4 py-3.5">
                   {status && obr ? (
@@ -177,14 +241,24 @@ export function Filhos() {
                   )}
                 </td>
                 <td className="px-4 py-3.5">
-                  <button
-                    type="button"
-                    onClick={() => setDetailId(filho.id)}
-                    className="inline-flex items-center gap-1.5 rounded border border-[var(--color-border)] bg-white/70 px-2.5 py-1 text-xs font-medium text-[var(--color-forest)] hover:bg-[var(--color-parchment)]"
-                  >
-                    <History size={13} />
-                    Detalhes
-                  </button>
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => openEdit(filho)}
+                      className="inline-flex items-center gap-1 rounded border border-[var(--color-border)] bg-white/70 px-2 py-1 text-xs font-medium text-[var(--color-forest)] hover:bg-[var(--color-parchment)]"
+                    >
+                      <Pencil size={12} />
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDetailId(filho.id)}
+                      className="inline-flex items-center gap-1 rounded border border-[var(--color-border)] bg-white/70 px-2 py-1 text-xs font-medium text-[var(--color-forest)] hover:bg-[var(--color-parchment)]"
+                    >
+                      <History size={12} />
+                      Histórico
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -217,8 +291,8 @@ export function Filhos() {
                   : '—'}
               </div>
               <div>Nascimento: {formatBR(detailFilho.dataNascimento)}</div>
-              <div>Entrada: {formatBR(detailFilho.dataEntrada)}</div>
-              <div>Iniciação: {formatBR(detailFilho.iniciacao)}</div>
+              <div>Entrada no terreiro: {formatBR(detailFilho.dataEntrada)}</div>
+              <div>Iniciação / fechamento: {formatBR(detailFilho.iniciacao)}</div>
               <div>Tel. 1: {detailFilho.telefone1 || '—'}</div>
               <div>Tel. 2: {detailFilho.telefone2 || '—'}</div>
               {detailFilho.email ? <div>E-mail: {detailFilho.email}</div> : null}
@@ -269,7 +343,15 @@ export function Filhos() {
               </ul>
             )}
 
-            <div className="mt-5 flex justify-end">
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => openEdit(detailFilho)}
+                className="inline-flex items-center gap-1.5 rounded-md border border-[var(--color-forest)] px-4 py-2 text-sm font-semibold text-[var(--color-forest)]"
+              >
+                <Pencil size={14} />
+                Editar cadastro
+              </button>
               <button
                 type="button"
                 onClick={() => setDetailId(null)}

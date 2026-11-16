@@ -3,28 +3,40 @@ import { Loader2, Plus, Trash2, UserPlus, X } from 'lucide-react'
 import { ORIXAS } from '../../data/mock'
 import { useApp } from '../../context/AppContext'
 import { formatCep, lookupCep } from '../../lib/viacep'
-import type { Endereco, Orixa } from '../../types'
+import type { Endereco, Filho, Orixa } from '../../types'
 import { emptyEndereco } from '../../types'
 
-export function NovoFilhoModal({ onClose }: { onClose: () => void }) {
-  const { addFilho } = useApp()
+type Props = {
+  onClose: () => void
+  initial?: Filho | null
+}
+
+export function NovoFilhoModal({ onClose, initial = null }: Props) {
+  const { addFilho, updateFilho } = useApp()
+  const editing = Boolean(initial?.id)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [cepStatus, setCepStatus] = useState('')
   const [cepLoading, setCepLoading] = useState(false)
 
-  const [nome, setNome] = useState('')
-  const [orixa, setOrixa] = useState<Orixa>('Omulu')
-  const [paiDeCabeca, setPaiDeCabeca] = useState('')
-  const [maeDeCabeca, setMaeDeCabeca] = useState('')
-  const [guias, setGuias] = useState<string[]>([''])
-  const [dataNascimento, setDataNascimento] = useState('')
-  const [dataEntrada, setDataEntrada] = useState('')
-  const [iniciacao, setIniciacao] = useState('')
-  const [telefone1, setTelefone1] = useState('')
-  const [telefone2, setTelefone2] = useState('')
-  const [email, setEmail] = useState('')
-  const [endereco, setEndereco] = useState<Endereco>(emptyEndereco())
+  const [nome, setNome] = useState(initial?.nome ?? '')
+  const [orixa, setOrixa] = useState<Orixa>(initial?.orixa ?? 'Omulu')
+  const [paiDeCabeca, setPaiDeCabeca] = useState(initial?.paiDeCabeca ?? '')
+  const [maeDeCabeca, setMaeDeCabeca] = useState(initial?.maeDeCabeca ?? '')
+  const [guias, setGuias] = useState<string[]>(
+    initial?.guias?.length ? initial.guias : [''],
+  )
+  const [dataNascimento, setDataNascimento] = useState(
+    initial?.dataNascimento ?? '',
+  )
+  const [dataEntrada, setDataEntrada] = useState(initial?.dataEntrada ?? '')
+  const [iniciacao, setIniciacao] = useState(initial?.iniciacao ?? '')
+  const [telefone1, setTelefone1] = useState(initial?.telefone1 ?? '')
+  const [telefone2, setTelefone2] = useState(initial?.telefone2 ?? '')
+  const [email, setEmail] = useState(initial?.email ?? '')
+  const [endereco, setEndereco] = useState<Endereco>(
+    initial?.endereco ?? emptyEndereco(),
+  )
 
   function updateGuia(index: number, value: string) {
     setGuias((prev) => prev.map((g, i) => (i === index ? value : g)))
@@ -35,12 +47,17 @@ export function NovoFilhoModal({ onClose }: { onClose: () => void }) {
   }
 
   function removeGuia(index: number) {
-    setGuias((prev) => (prev.length <= 1 ? [''] : prev.filter((_, i) => i !== index)))
+    setGuias((prev) =>
+      prev.length <= 1 ? [''] : prev.filter((_, i) => i !== index),
+    )
   }
 
-  async function handleCepBlur() {
+  async function handleCepLookup() {
     const digits = endereco.cep.replace(/\D/g, '')
-    if (digits.length !== 8) return
+    if (digits.length !== 8) {
+      setCepStatus('CEP deve ter 8 dígitos.')
+      return
+    }
     setCepLoading(true)
     setCepStatus('')
     const result = await lookupCep(digits)
@@ -65,8 +82,7 @@ export function NovoFilhoModal({ onClose }: { onClose: () => void }) {
       setError('Nome e telefone 1 são obrigatórios.')
       return
     }
-    setSaving(true)
-    const result = await addFilho({
+    const payload = {
       nome: nome.trim(),
       orixa,
       paiDeCabeca: paiDeCabeca.trim() || orixa,
@@ -83,7 +99,11 @@ export function NovoFilhoModal({ onClose }: { onClose: () => void }) {
         cep: formatCep(endereco.cep),
         uf: endereco.uf.toUpperCase().slice(0, 2),
       },
-    })
+    }
+    setSaving(true)
+    const result = editing && initial
+      ? await updateFilho(initial.id, payload)
+      : await addFilho(payload)
     setSaving(false)
     if (!result.ok) {
       setError(result.error ?? 'Não foi possível salvar.')
@@ -102,16 +122,16 @@ export function NovoFilhoModal({ onClose }: { onClose: () => void }) {
         className="animate-modal max-h-[94vh] w-full max-w-2xl overflow-y-auto rounded-t-2xl border border-[var(--color-border)] bg-[var(--color-cream)] shadow-xl sm:rounded-lg"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
-        aria-labelledby="novo-filho-title"
+        aria-labelledby="filho-form-title"
       >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--color-border-soft)] bg-[var(--color-cream)] px-5 py-4">
           <div className="flex items-center gap-2">
             <UserPlus size={18} className="text-[var(--color-forest)]" />
             <h2
-              id="novo-filho-title"
+              id="filho-form-title"
               className="font-serif text-xl font-semibold text-[var(--color-forest)]"
             >
-              + Novo Filho
+              {editing ? 'Editar Filho' : '+ Novo Filho'}
             </h2>
           </div>
           <button
@@ -277,7 +297,7 @@ export function NovoFilhoModal({ onClose }: { onClose: () => void }) {
                       cep: formatCep(e.target.value),
                     }))
                   }
-                  onBlur={handleCepBlur}
+                  onBlur={handleCepLookup}
                   placeholder="00000-000"
                   inputMode="numeric"
                   className="field-input"
@@ -286,11 +306,13 @@ export function NovoFilhoModal({ onClose }: { onClose: () => void }) {
               <div className="flex items-end pb-0.5">
                 <button
                   type="button"
-                  onClick={handleCepBlur}
+                  onClick={handleCepLookup}
                   disabled={cepLoading}
                   className="inline-flex h-[38px] items-center gap-1.5 rounded-md border border-[var(--color-forest)] px-3 text-sm font-semibold text-[var(--color-forest)] hover:bg-[var(--color-parchment)] disabled:opacity-60"
                 >
-                  {cepLoading ? <Loader2 size={14} className="animate-spin" /> : null}
+                  {cepLoading ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : null}
                   Buscar CEP
                 </button>
               </div>
@@ -302,7 +324,10 @@ export function NovoFilhoModal({ onClose }: { onClose: () => void }) {
               <input
                 value={endereco.logradouro}
                 onChange={(e) =>
-                  setEndereco((prev) => ({ ...prev, logradouro: e.target.value }))
+                  setEndereco((prev) => ({
+                    ...prev,
+                    logradouro: e.target.value,
+                  }))
                 }
                 className="field-input"
               />
@@ -366,7 +391,9 @@ export function NovoFilhoModal({ onClose }: { onClose: () => void }) {
           </Section>
 
           {error ? (
-            <p className="text-sm text-[var(--color-status-vencida-fg)]">{error}</p>
+            <p className="text-sm text-[var(--color-status-vencida-fg)]">
+              {error}
+            </p>
           ) : null}
 
           <div className="flex items-center justify-end gap-3 border-t border-[var(--color-border-soft)] pt-4">
@@ -383,7 +410,7 @@ export function NovoFilhoModal({ onClose }: { onClose: () => void }) {
               className="inline-flex items-center gap-2 rounded-md bg-[var(--color-forest)] px-4 py-2 text-sm font-semibold text-[var(--color-cream)] hover:bg-[var(--color-forest-hover)] disabled:opacity-60"
             >
               {saving ? <Loader2 size={14} className="animate-spin" /> : null}
-              Salvar filho
+              {editing ? 'Salvar alterações' : 'Salvar filho'}
             </button>
           </div>
         </form>

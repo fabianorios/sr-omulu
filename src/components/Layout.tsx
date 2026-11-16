@@ -9,8 +9,10 @@ import { AgendarObrigacaoModal } from './modals/AgendarObrigacaoModal'
 export function Layout() {
   const {
     openNovoFilho,
+    editingFilho,
     openAgendar,
     setOpenNovoFilho,
+    setEditingFilho,
     setOpenAgendar,
   } = useApp()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -36,6 +38,8 @@ export function Layout() {
     }
   }, [menuOpen])
 
+  const formOpen = openNovoFilho || editingFilho != null
+
   return (
     <div className="flex min-h-screen">
       <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
@@ -46,8 +50,15 @@ export function Layout() {
         </main>
       </div>
 
-      {openNovoFilho && (
-        <NovoFilhoModal onClose={() => setOpenNovoFilho(false)} />
+      {formOpen && (
+        <NovoFilhoModal
+          key={editingFilho?.id ?? 'new'}
+          initial={editingFilho}
+          onClose={() => {
+            setOpenNovoFilho(false)
+            setEditingFilho(null)
+          }}
+        />
       )}
       {openAgendar && (
         <AgendarObrigacaoModal onClose={() => setOpenAgendar(false)} />

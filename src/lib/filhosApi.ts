@@ -26,6 +26,12 @@ export type FilhoRow = {
 
 const LOCAL_KEY = 'sr-omulu.filhos.v1'
 
+function asDateInput(value: string | null | undefined): string {
+  if (!value) return ''
+  // Postgres/PGlite may return "1990-01-01" or ISO timestamps
+  return value.slice(0, 10)
+}
+
 export function rowToFilho(row: FilhoRow): Filho {
   return {
     id: row.id,
@@ -34,9 +40,9 @@ export function rowToFilho(row: FilhoRow): Filho {
     paiDeCabeca: row.pai_de_cabeca ?? '',
     maeDeCabeca: row.mae_de_cabeca ?? '',
     guias: row.guias ?? [],
-    dataNascimento: row.data_nascimento ?? '',
-    dataEntrada: row.data_entrada ?? '',
-    iniciacao: row.iniciacao ?? '',
+    dataNascimento: asDateInput(row.data_nascimento),
+    dataEntrada: asDateInput(row.data_entrada),
+    iniciacao: asDateInput(row.iniciacao),
     telefone1: row.telefone1 ?? '',
     telefone2: row.telefone2 ?? '',
     email: row.email ?? undefined,
@@ -140,4 +146,36 @@ export function loadLocalFilhos(): Filho[] {
 
 export function saveLocalFilhos(filhos: Filho[]) {
   localStorage.setItem(LOCAL_KEY, JSON.stringify(filhos))
+}
+
+export async function updateFilhoViaApi(
+  id: string,
+  filho: FilhoInput,
+): Promise<
+  | { ok: true; filho: Filho; source: 'postgres' | 'pglite' }
+  | { ok: false; error: string }
+> {
+  try {
+    const res = await fetch(`/api/filhos/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      credentials: 'same-origin',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(filhoToPayload(filho)),
+    })
+    const data = (await res.json()) as {
+      filho?: FilhoRow
+      error?: string
+      source?: string
+    }
+    if (!res.ok || !data.filho) {
+      return { ok: false, error: data.error ?? `http_${res.status}` }
+    }
+    return {
+      ok: true,
+      filho: rowToFilho(data.filho),
+      source: data.source === 'postgres' ? 'postgres' : 'pglite',
+    }
+  } catch {
+    return { ok: false, error: 'network' }
+  }
 }
