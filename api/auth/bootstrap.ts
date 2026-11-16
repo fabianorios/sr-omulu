@@ -1,7 +1,12 @@
 import {
-  countAdmins,
+  checkBootstrapToken,
+  checkLoginThrottle,
+  clearLoginThrottle,
+  clientKey,
+  countAdminRows,
   createSession,
   detectIdentificador,
+  getBootstrapSecret,
   hashPassword,
   json,
   publicUser,
@@ -9,10 +14,14 @@ import {
 } from '../../lib/auth'
 
 /**
- * One-time first admin creation when no admins exist.
- * Body: { nome, identificador (email|cpf|celular), senha }
+ * One-time first admin. Requires BOOTSTRAP_SECRET (body.bootstrapSecret or
+ * header x-bootstrap-secret). Closed once any admin row exists.
  */
 export async function POST(request: Request): Promise<Response> {
+  if (!getBootstrapSecret()) {
+    return json({ error: 'bootstrap_unavailable' }, 503)
+  }
+
   let body: Record<string, unknown>
   try {
     body = (await request.json()) as Record<string, unknown>
@@ -20,8 +29,30 @@ export async function POST(request: Request): Promise<Response> {
     return json({ error: 'invalid_json' }, 400)
   }
 
+  const provided = String(
+    body.bootstrapSecret ??
+      body.installCode ??
+      request.headers.get('x-bootstrap-secret') ??
+      '',
+  ).trim()
+
+  const throttleKey = clientKey(request, `bootstrap:${provided || 'empty'}`)
+  const throttle = checkLoginThrottle(throttleKey, 5, 15 * 60 * 1000)
+  if (!throttle.ok) {
+    return json(
+      { error: 'too_many_attempts', retryAfterSec: throttle.retryAfterSec },
+      429,
+      { 'retry-after': String(throttle.retryAfterSec) },
+    )
+  }
+
+  if (!provided || !checkBootstrapToken(provided)) {
+    return json({ error: 'invalid_bootstrap_secret' }, 401)
+  }
+  clearLoginThrottle(throttleKey)
+
   try {
-    const admins = await countAdmins()
+    const admins = await countAdminRows()
     if (admins > 0) {
       return json({ error: 'bootstrap_closed' }, 403)
     }

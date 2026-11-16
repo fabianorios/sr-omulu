@@ -8,6 +8,7 @@ export function Login() {
   const [nome, setNome] = useState('')
   const [identificador, setIdentificador] = useState('')
   const [senha, setSenha] = useState('')
+  const [bootstrapSecret, setBootstrapSecret] = useState('')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -16,7 +17,7 @@ export function Login() {
     setError('')
     setSaving(true)
     const result = needsBootstrap
-      ? await bootstrap({ nome, identificador, senha })
+      ? await bootstrap({ nome, identificador, senha, bootstrapSecret })
       : await login(identificador, senha)
     setSaving(false)
     if (!result.ok) {
@@ -25,7 +26,12 @@ export function Login() {
         nome_identificador_senha_min_8:
           'Nome, identificador e senha (mín. 8) são obrigatórios.',
         bootstrap_closed: 'Já existe administrador. Faça login.',
+        invalid_bootstrap_secret: 'Código de instalação inválido.',
+        bootstrap_unavailable:
+          'Bootstrap indisponível. Configure BOOTSTRAP_SECRET no host.',
         identificador_senha_required: 'Preencha identificador e senha.',
+        too_many_attempts:
+          'Muitas tentativas. Aguarde alguns minutos e tente de novo.',
       }
       setError(map[result.error ?? ''] ?? 'Não foi possível entrar.')
     }
@@ -49,24 +55,39 @@ export function Login() {
           </h1>
           <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
             {needsBootstrap
-              ? 'Primeiro acesso: cadastre o administrador da casa (único enquanto não houver usuários).'
+              ? 'Primeiro acesso: informe o código de instalação (BOOTSTRAP_SECRET) e cadastre o administrador.'
               : 'Use CPF, e-mail ou celular e sua senha.'}
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
           {needsBootstrap ? (
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase">
-                Nome
-              </span>
-              <input
-                required
-                value={nome}
-                onChange={(e) => setNome(e.target.value)}
-                className="w-full rounded-md border border-[var(--color-border)] bg-white px-3 py-2 text-sm"
-              />
-            </label>
+            <>
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase">
+                  Código de instalação
+                </span>
+                <input
+                  required
+                  type="password"
+                  value={bootstrapSecret}
+                  onChange={(e) => setBootstrapSecret(e.target.value)}
+                  className="w-full rounded-md border border-[var(--color-border)] bg-white px-3 py-2 text-sm"
+                  autoComplete="off"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase">
+                  Nome
+                </span>
+                <input
+                  required
+                  value={nome}
+                  onChange={(e) => setNome(e.target.value)}
+                  className="w-full rounded-md border border-[var(--color-border)] bg-white px-3 py-2 text-sm"
+                />
+              </label>
+            </>
           ) : null}
 
           <label className="block">

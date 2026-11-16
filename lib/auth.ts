@@ -149,11 +149,77 @@ function readCookie(request: Request, name: string): string | null {
   return null
 }
 
+/** Active admins (login eligibility). */
 export async function countAdmins(): Promise<number> {
   const rows = await sql<{ n: string | number }>(
     `select count(*)::int as n from usuarios where role = 'admin' and ativo = true`,
   )
   return Number(rows[0]?.n ?? 0)
+}
+
+/**
+ * Any admin row (active or not). Used to permanently close open bootstrap
+ * so deactivating the last admin cannot reopen public signup.
+ */
+export async function countAdminRows(): Promise<number> {
+  const rows = await sql<{ n: string | number }>(
+    `select count(*)::int as n from usuarios where role = 'admin'`,
+  )
+  return Number(rows[0]?.n ?? 0)
+}
+
+/**
+ * Shared install secret for one-time bootstrap.
+ * Must be set via BOOTSTRAP_SECRET (Cursor app secret / local env).
+ * No hardcoded fallback — absence closes the endpoint.
+ */
+export function getBootstrapSecret(): string | null {
+  const fromEnv = process.env.BOOTSTRAP_SECRET?.trim()
+  return fromEnv || null
+}
+
+export function bootstrapAvailable(): boolean {
+  return getBootstrapSecret() != null
+}
+
+export function checkBootstrapToken(provided: string): boolean {
+  const expected = getBootstrapSecret()
+  if (!expected) return false
+  const a = Buffer.from(provided)
+  const b = Buffer.from(expected)
+  if (a.length !== b.length) return false
+  return timingSafeEqual(a, b)
+}
+
+/** Simple in-memory login throttle (per process). */
+const loginAttempts = new Map<string, { count: number; resetAt: number }>()
+
+export function checkLoginThrottle(
+  key: string,
+  limit = 8,
+  windowMs = 15 * 60 * 1000,
+): { ok: true } | { ok: false; retryAfterSec: number } {
+  const now = Date.now()
+  const cur = loginAttempts.get(key)
+  if (!cur || cur.resetAt <= now) {
+    loginAttempts.set(key, { count: 1, resetAt: now + windowMs })
+    return { ok: true }
+  }
+  if (cur.count >= limit) {
+    return { ok: false, retryAfterSec: Math.ceil((cur.resetAt - now) / 1000) }
+  }
+  cur.count += 1
+  return { ok: true }
+}
+
+export function clearLoginThrottle(key: string) {
+  loginAttempts.delete(key)
+}
+
+export function clientKey(request: Request, identificador: string): string {
+  const fwd = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+  const ip = fwd || request.headers.get('x-real-ip') || 'unknown'
+  return `${ip}|${identificador.trim().toLowerCase()}`
 }
 
 export async function findUserByIdentificador(

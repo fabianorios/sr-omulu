@@ -32,7 +32,22 @@ export type FilhoRow = {
   endereco_uf: string | null
 }
 
-const LOCAL_KEY = 'sr-omulu.filhos.v3'
+const LOCAL_KEYS = [
+  'sr-omulu.filhos.v3',
+  'sr-omulu.filhos.v2',
+  'sr-omulu.filhos.v1',
+]
+
+/** Remove any leftover browser caches that held cadastro PII. */
+export function clearLocalFilhosCache() {
+  for (const key of LOCAL_KEYS) {
+    try {
+      localStorage.removeItem(key)
+    } catch {
+      /* ignore */
+    }
+  }
+}
 
 function asDateInput(value: string | null | undefined): string {
   if (!value) return ''
@@ -101,6 +116,7 @@ export type LoadFilhosResult =
   | { source: 'error'; filhos: Filho[]; error: string }
 
 export async function loadFilhosFromApi(): Promise<LoadFilhosResult> {
+  clearLocalFilhosCache()
   try {
     const res = await fetch('/api/filhos', { credentials: 'same-origin' })
     if (res.status === 401) {
@@ -186,28 +202,13 @@ export async function updateFilhoViaApi(
   }
 }
 
+/** No longer reads PII from localStorage; clears leftover keys. */
 export function loadLocalFilhos(): Filho[] {
-  try {
-    const raw = localStorage.getItem(LOCAL_KEY)
-    if (!raw) return []
-    const parsed = JSON.parse(raw) as Array<
-      Filho & { guias?: string[]; entidades?: EntidadeLinha[] }
-    >
-    if (!Array.isArray(parsed)) return []
-    return parsed.map((f) => ({
-      ...f,
-      paiDeCabeca: fallbackPai(f.paiDeCabeca),
-      maeDeCabeca: fallbackMae(f.maeDeCabeca),
-      entidades:
-        f.entidades && f.entidades.length > 0
-          ? normalizeEntidades(f.entidades)
-          : normalizeEntidades(f.guias ?? []),
-    }))
-  } catch {
-    return []
-  }
+  clearLocalFilhosCache()
+  return []
 }
 
-export function saveLocalFilhos(filhos: Filho[]) {
-  localStorage.setItem(LOCAL_KEY, JSON.stringify(filhos))
+/** No longer writes PII to localStorage; clears leftover keys. */
+export function saveLocalFilhos(_filhos: Filho[]) {
+  clearLocalFilhosCache()
 }

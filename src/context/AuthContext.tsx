@@ -33,6 +33,7 @@ type AuthContextValue = {
     nome: string
     identificador: string
     senha: string
+    bootstrapSecret: string
   }) => Promise<{ ok: boolean; error?: string }>
   logout: () => Promise<void>
   refresh: () => Promise<void>
@@ -78,7 +79,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ identificador, senha }),
       })
-      const data = (await res.json()) as { user?: AuthUser; error?: string }
+      const data = (await res.json()) as {
+        user?: AuthUser
+        error?: string
+      }
       if (!res.ok || !data.user) {
         return { ok: false, error: data.error ?? 'login_failed' }
       }
@@ -90,12 +94,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const bootstrap = useCallback(
-    async (input: { nome: string; identificador: string; senha: string }) => {
+    async (input: {
+      nome: string
+      identificador: string
+      senha: string
+      bootstrapSecret: string
+    }) => {
       const res = await fetch('/api/auth/bootstrap', {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(input),
+        body: JSON.stringify({
+          nome: input.nome,
+          identificador: input.identificador,
+          senha: input.senha,
+          bootstrapSecret: input.bootstrapSecret,
+        }),
       })
       const data = (await res.json()) as { user?: AuthUser; error?: string }
       if (!res.ok || !data.user) {
@@ -113,6 +127,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       method: 'POST',
       credentials: 'same-origin',
     })
+    try {
+      for (const key of [
+        'sr-omulu.filhos.v3',
+        'sr-omulu.filhos.v2',
+        'sr-omulu.filhos.v1',
+        'sr-omulu.cobrancas.v1',
+        'sr-omulu.cobrancas.v0',
+      ]) {
+        localStorage.removeItem(key)
+      }
+    } catch {
+      /* ignore */
+    }
     setUser(null)
     await refresh()
   }, [refresh])

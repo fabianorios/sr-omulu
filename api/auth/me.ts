@@ -1,14 +1,22 @@
-import { getAppSession, json, publicUser } from '../../lib/auth'
-import { countAdmins } from '../../lib/auth'
+import {
+  bootstrapAvailable,
+  countAdminRows,
+  getAppSession,
+  json,
+  publicUser,
+} from '../../lib/auth'
 
 export async function GET(request: Request): Promise<Response> {
   try {
     const session = await getAppSession(request)
-    const admins = await countAdmins()
+    const adminRows = await countAdminRows()
+    const needsBootstrap =
+      adminRows === 0 && bootstrapAvailable() && !session
+
     if (!session) {
       return json({
         authenticated: false,
-        needsBootstrap: admins === 0,
+        needsBootstrap,
       })
     }
     return json({

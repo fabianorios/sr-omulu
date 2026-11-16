@@ -1,4 +1,7 @@
 import {
+  checkLoginThrottle,
+  clearLoginThrottle,
+  clientKey,
   createSession,
   findUserByIdentificador,
   json,
@@ -20,11 +23,22 @@ export async function POST(request: Request): Promise<Response> {
     return json({ error: 'identificador_senha_required' }, 400)
   }
 
+  const throttleKey = clientKey(request, identificador)
+  const throttle = checkLoginThrottle(throttleKey)
+  if (!throttle.ok) {
+    return json(
+      { error: 'too_many_attempts', retryAfterSec: throttle.retryAfterSec },
+      429,
+      { 'retry-after': String(throttle.retryAfterSec) },
+    )
+  }
+
   try {
     const user = await findUserByIdentificador(identificador)
     if (!user || !verifyPassword(senha, user.password_hash)) {
       return json({ error: 'invalid_credentials' }, 401)
     }
+    clearLoginThrottle(throttleKey)
     const session = await createSession(user.id)
     return json(
       {
