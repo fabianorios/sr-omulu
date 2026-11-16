@@ -9,8 +9,8 @@ type HeaderProps = {
 const SOURCE_LABEL = {
   sample: 'Dados de exemplo',
   local: 'Rascunho local',
-  supabase: 'Supabase',
-  unset: 'Sem banco',
+  postgres: 'Postgres',
+  pglite: 'DB local',
 } as const
 
 export function Header({ onOpenMenu }: HeaderProps) {

@@ -6,6 +6,6 @@ import { apiDevPlugin } from './vite-plugin-api.ts'
 export default defineConfig({
   plugins: [react(), tailwindcss(), apiDevPlugin()],
   ssr: {
-    external: ['@supabase/supabase-js'],
+    external: ['pg', '@electric-sql/pglite'],
   },
 })

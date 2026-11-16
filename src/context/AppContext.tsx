@@ -56,27 +56,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const remote = await loadFilhosFromApi()
       if (cancelled) return
 
-      if (remote.source === 'supabase') {
-        setState((prev) => ({
-          ...prev,
-          filhos: remote.filhos,
-          dataSource: 'supabase',
-        }))
-      } else {
-        const local = loadLocalFilhos()
-        if (local.length > 0) {
+      if (remote.source === 'postgres' || remote.source === 'pglite') {
+        if (remote.filhos.length === 0) {
+          const local = loadLocalFilhos()
           setState((prev) => ({
             ...prev,
-            filhos: local,
-            dataSource: 'local',
+            filhos: local.length > 0 ? local : createSampleFilhos(),
+            dataSource: local.length > 0 ? 'local' : 'sample',
           }))
         } else {
           setState((prev) => ({
             ...prev,
-            filhos: createSampleFilhos(),
-            dataSource: 'sample',
+            filhos: remote.filhos,
+            dataSource: remote.source,
           }))
         }
+      } else {
+        const local = loadLocalFilhos()
+        setState((prev) => ({
+          ...prev,
+          filhos: local.length > 0 ? local : createSampleFilhos(),
+          dataSource: local.length > 0 ? 'local' : 'sample',
+        }))
       }
       setLoadingFilhos(false)
     })()
@@ -94,30 +95,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const addFilho = useCallback(async (filho: FilhoInput) => {
     const remote = await createFilhoViaApi(filho)
     if (remote.ok === true) {
-      setState((prev) => ({
-        ...prev,
-        filhos: [...prev.filhos, remote.filho],
-        dataSource: 'supabase',
-      }))
+      setState((prev) => {
+        const leavingSample =
+          prev.dataSource === 'sample' || prev.dataSource === 'local'
+        const filhos = leavingSample
+          ? [remote.filho]
+          : [...prev.filhos, remote.filho]
+        return {
+          ...prev,
+          filhos,
+          dataSource: remote.source,
+        }
+      })
       return { ok: true }
     }
 
     const err = remote.error
-    // Fallback local/sample when Supabase is unset or API unavailable
-    if (
-      err === 'supabase_unset' ||
-      err === 'network' ||
-      err.startsWith('http_503')
-    ) {
+    if (err === 'network' || err.startsWith('http_5')) {
       const created: Filho = { ...filho, id: filho.id ?? uid('f') }
       setState((prev) => {
         const filhos = [...prev.filhos, created]
         saveLocalFilhos(filhos)
-        return {
-          ...prev,
-          filhos,
-          dataSource: prev.dataSource === 'supabase' ? 'supabase' : 'local',
-        }
+        return { ...prev, filhos, dataSource: 'local' }
       })
       return { ok: true }
     }

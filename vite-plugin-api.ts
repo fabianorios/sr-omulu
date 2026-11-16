@@ -10,12 +10,15 @@ type HandlerModule = {
   DELETE?: (req: Request) => Promise<Response> | Response
 }
 
-async function readBody(req: IncomingMessage): Promise<ArrayBuffer> {
-  const chunks: Buffer[] = []
-  for await (const chunk of req) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
-  }
-  return Buffer.concat(chunks).buffer
+function readBody(req: IncomingMessage): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = []
+    req.on('data', (chunk) => {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+    })
+    req.on('end', () => resolve(Buffer.concat(chunks)))
+    req.on('error', reject)
+  })
 }
 
 function toWebHeaders(req: IncomingMessage): Headers {
@@ -36,14 +39,18 @@ async function toWebRequest(
   url: string,
 ): Promise<Request> {
   const method = (req.method ?? 'GET').toUpperCase()
-  const init: RequestInit = {
+  const headers = toWebHeaders(req)
+  if (method === 'GET' || method === 'HEAD') {
+    return new Request(url, { method, headers })
+  }
+  const raw = await readBody(req)
+  return new Request(url, {
     method,
-    headers: toWebHeaders(req),
-  }
-  if (method !== 'GET' && method !== 'HEAD') {
-    init.body = await readBody(req)
-  }
-  return new Request(url, init)
+    headers,
+    body: new Uint8Array(raw),
+    // Required by Node's undici when Request has a body
+    duplex: 'half',
+  } as RequestInit)
 }
 
 async function writeWebResponse(

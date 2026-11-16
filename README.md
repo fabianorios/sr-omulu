@@ -5,45 +5,34 @@ Agenda e controle inteligente de obrigações dos médiuns da casa.
 ## Stack
 
 - Vite + React 19 + TypeScript
-- Tailwind CSS v4 (`@tailwindcss/vite`)
-- Lucide React (ícones)
-- date-fns (datas em pt-BR)
-- React Router
-- Supabase (cadastro de filhos, server-side)
+- Tailwind CSS v4
+- Lucide + date-fns + React Router
+- **Cursor Postgres** (`cursor-app.json` → platform `DATABASE_URL`)
 - ViaCEP (busca de endereço)
+- Schema espelhado em `supabase/schema.sql` para migração futura
 
 ## Scripts
 
 ```bash
 npm install
-npm run dev      # http://127.0.0.1:5173
-npm run build
+npm run dev      # http://127.0.0.1:5173 (PGlite in-memory; no DATABASE_URL)
+npm run build   # vite build + migrate when DATABASE_URL is set
 npm run preview
 ```
 
-## Rotas
+## Database
 
-| Rota | Tela |
-|------|------|
-| `/` | Dashboard da Casa |
-| `/agenda` | Agenda (calendário mensal) |
-| `/filhos` | Lista de Filhos |
-| `/config` | Obrigações & Configurações |
+- Declare: `cursor-app.json` `{ "database": "postgres" }`
+- Migration: `migrations/001_create_filhos.sql`
+- Local API uses **PGlite** when `DATABASE_URL` is unset
+- Production DB is provisioned on **private/team publish** (platform sets `DATABASE_URL`)
 
-## Dados
+Do not commit or paste `DATABASE_URL`.
 
-Sem Supabase configurado, o app usa **dados de exemplo anonimizados** (ou rascunho no `localStorage` ao cadastrar). Com Supabase + secrets no Cursor, filhos passam a ir/voltar pela API `/api/filhos` (service role só no servidor).
+## Cadastro de filhos
 
-## Supabase (setup)
-
-1. Crie um projeto em [supabase.com](https://supabase.com).
-2. No SQL Editor, rode `supabase/schema.sql`.
-3. Em Project Settings → API, copie:
-   - Project URL → secret `SUPABASE_URL`
-   - `service_role` key → secret `SUPABASE_SERVICE_ROLE_KEY`
-   - `anon` `public` key → secret `SUPABASE_ANON_KEY` (reservada para uso futuro; escrita usa service role)
-4. Adicione esses 3 nomes nas Secrets do app no Cursor (já declarados via bind-app-secrets). **Não cole as chaves no chat nem no Git.**
+Pai/mãe de cabeça, guias (vários), nascimento, entrada no terreiro, até 2 telefones, endereço + CEP (ViaCEP), orixá/iniciação.
 
 ## Publicação
 
-Não publique como público: o cadastro contém PII. Quando for publicar, use **Private** ou **Team** e confirme antes.
+Não publique como público (PII). Quando for publicar, use **Private** ou **Team** — o Postgres da plataforma é criado nesse publish.

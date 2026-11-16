@@ -1,5 +1,6 @@
--- Tenda Senhor Omulu — schema de filhos (rode no SQL Editor do Supabase)
--- Projeto: crie um projeto Postgres no Supabase e cole este script.
+-- Kept as a Supabase-equivalent reference for a future migration.
+-- Active schema for Cursor Postgres lives in migrations/001_create_filhos.sql
+-- (same columns). To move later: create a Supabase project and run this file.
 
 create extension if not exists "pgcrypto";
 
@@ -30,24 +31,4 @@ create table if not exists public.filhos (
 create index if not exists filhos_nome_idx on public.filhos (nome);
 create index if not exists filhos_orixa_idx on public.filhos (orixa);
 
-create or replace function public.set_updated_at()
-returns trigger
-language plpgsql
-as $$
-begin
-  new.updated_at = now();
-  return new;
-end;
-$$;
-
-drop trigger if exists filhos_set_updated_at on public.filhos;
-create trigger filhos_set_updated_at
-before update on public.filhos
-for each row execute function public.set_updated_at();
-
--- Acesso apenas via service role no servidor do app (não exponha a service role no browser).
 alter table public.filhos enable row level security;
-
--- Sem policies para anon/authenticated: o app usa SUPABASE_SERVICE_ROLE_KEY só no backend.
-comment on table public.filhos is
-  'Cadastro de filhos da casa. Escrita/leitura via API server-side do app Cursor.';

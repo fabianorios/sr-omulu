@@ -1,7 +1,7 @@
 import type { Filho, FilhoInput, Orixa } from '../types'
 import { emptyEndereco } from '../types'
 
-/** Shape returned by /api/filhos (snake_case from Supabase). */
+/** Shape returned by /api/filhos (snake_case from Postgres). */
 export type FilhoRow = {
   id: string
   nome: string
@@ -70,8 +70,7 @@ export function filhoToPayload(filho: FilhoInput) {
 }
 
 export type LoadFilhosResult =
-  | { source: 'supabase'; filhos: Filho[] }
-  | { source: 'unset'; filhos: Filho[] }
+  | { source: 'postgres' | 'pglite'; filhos: Filho[] }
   | { source: 'error'; filhos: Filho[]; error: string }
 
 export async function loadFilhosFromApi(): Promise<LoadFilhosResult> {
@@ -86,13 +85,10 @@ export async function loadFilhosFromApi(): Promise<LoadFilhosResult> {
     const data = (await res.json()) as {
       source?: string
       filhos?: FilhoRow[]
-      message?: string
     }
-    if (data.source === 'unset' || data.message === 'supabase_unset') {
-      return { source: 'unset', filhos: [] }
-    }
+    const source = data.source === 'postgres' ? 'postgres' : 'pglite'
     return {
-      source: 'supabase',
+      source,
       filhos: (data.filhos ?? []).map(rowToFilho),
     }
   } catch {
@@ -102,7 +98,10 @@ export async function loadFilhosFromApi(): Promise<LoadFilhosResult> {
 
 export async function createFilhoViaApi(
   filho: FilhoInput,
-): Promise<{ ok: true; filho: Filho } | { ok: false; error: string }> {
+): Promise<
+  | { ok: true; filho: Filho; source: 'postgres' | 'pglite' }
+  | { ok: false; error: string }
+> {
   try {
     const res = await fetch('/api/filhos', {
       method: 'POST',
@@ -110,11 +109,19 @@ export async function createFilhoViaApi(
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(filhoToPayload(filho)),
     })
-    const data = (await res.json()) as { filho?: FilhoRow; error?: string }
+    const data = (await res.json()) as {
+      filho?: FilhoRow
+      error?: string
+      source?: string
+    }
     if (!res.ok || !data.filho) {
       return { ok: false, error: data.error ?? `http_${res.status}` }
     }
-    return { ok: true, filho: rowToFilho(data.filho) }
+    return {
+      ok: true,
+      filho: rowToFilho(data.filho),
+      source: data.source === 'postgres' ? 'postgres' : 'pglite',
+    }
   } catch {
     return { ok: false, error: 'network' }
   }

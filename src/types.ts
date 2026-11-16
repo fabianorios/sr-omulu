@@ -73,7 +73,7 @@ export interface HouseEvent {
   tipo: 'gira' | 'festa' | 'evento'
 }
 
-export type DataSource = 'sample' | 'local' | 'supabase' | 'unset'
+export type DataSource = 'sample' | 'local' | 'postgres' | 'pglite'
 
 export interface AppState {
   filhos: Filho[]
