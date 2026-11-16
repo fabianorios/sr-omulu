@@ -41,6 +41,23 @@ Cobranças por filho: **Mensalidade** (valor fixo + dia do mês 1–28 → venci
 
 Ao agendar/editar tipos, liste **itens** e **quantidade**. Persistidos em `obrigacoes.itens` (jsonb) e exibidos no histórico.
 
+## Autenticação e papéis (app público)
+
+Login com **CPF**, **e-mail** ou **celular** + senha (cookie HttpOnly `sr_omulu_sess`).
+
+| Papel | Acesso |
+|-------|--------|
+| **Administrador** | CRUD filhos, financeiro, obrigações, config, usuários |
+| **Médium** | Somente o próprio filho vinculado (cadastro, obrigações, cobranças); pode marcar pagamento próprio |
+
+APIs exigem sessão. Médiuns não listam tabelas inteiras — filtro por `filho_id`.
+
+### Bootstrap do primeiro admin
+
+Se não houver administradores ativos, a tela de login vira **Criar administrador** (`POST /api/auth/bootstrap`). Depois disso o endpoint fecha (`403 bootstrap_closed`). Novos usuários são criados em **Usuários** (só admin).
+
+Migration: `migrations/005_auth_usuarios.sql`.
+
 ## Publicação
 
-Não publique como público (PII). Quando for publicar, use **Private** ou **Team** — o Postgres da plataforma é criado nesse publish.
+Pode publicar como **público** com o login in-app acima. Postgres da plataforma continua disponível quando `cursor-app.json` declara database.

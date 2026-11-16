@@ -3,18 +3,19 @@ import {
   CalendarDays,
   LayoutDashboard,
   Settings,
+  Shield,
   Users,
   Wallet,
   X,
 } from 'lucide-react'
 import { Logo } from './Logo'
+import { useAuth } from '../context/AuthContext'
 
-const links = [
+const baseLinks = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/agenda', label: 'Agenda', icon: CalendarDays },
   { to: '/financeiro', label: 'Agenda financeira', icon: Wallet },
   { to: '/filhos', label: 'Lista de Filhos', icon: Users },
-  { to: '/config', label: 'Obrigações & Config.', icon: Settings },
 ]
 
 type SidebarProps = {
@@ -23,6 +24,17 @@ type SidebarProps = {
 }
 
 export function Sidebar({ open = false, onClose }: SidebarProps) {
+  const { isAdmin } = useAuth()
+  const links = [
+    ...baseLinks,
+    ...(isAdmin
+      ? [
+          { to: '/config', label: 'Obrigações & Config.', icon: Settings },
+          { to: '/usuarios', label: 'Usuários', icon: Shield },
+        ]
+      : []),
+  ]
+
   return (
     <>
       <div

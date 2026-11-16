@@ -1,5 +1,12 @@
-import { requireIdentity } from '../cursor/identity'
-import { dbMode, json, sql } from '../lib/db'
+import {
+  canAccessFilho,
+  filhoIdScopeSql,
+  json,
+  requireAdmin,
+  requireAppSession,
+  sql,
+} from '../lib/auth'
+import { dbMode } from '../lib/db'
 
 type CobrancaRow = Record<string, unknown>
 type TipoRow = Record<string, unknown>
@@ -7,13 +14,16 @@ type TipoRow = Record<string, unknown>
 const CATS = new Set(['mensalidade', 'contribuicao', 'outro'])
 
 export async function GET(request: Request): Promise<Response> {
-  const identity = await requireIdentity(request)
-  if (identity instanceof Response) return identity
+  const session = await requireAppSession(request)
+  if (session instanceof Response) return session
 
   try {
+    const scope = filhoIdScopeSql(session)
     const [cobrancas, tipos] = await Promise.all([
       sql<CobrancaRow>(
-        `select * from cobrancas order by vencimento asc, created_at asc`,
+        `select * from cobrancas where true${scope.clause}
+         order by vencimento asc, created_at asc`,
+        scope.params,
       ),
       sql<TipoRow>(
         `select * from cobranca_tipos where ativo = true order by nome asc`,
@@ -29,8 +39,10 @@ export async function GET(request: Request): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  const identity = await requireIdentity(request)
-  if (identity instanceof Response) return identity
+  const session = await requireAppSession(request)
+  if (session instanceof Response) return session
+  const admin = requireAdmin(session)
+  if (admin instanceof Response) return admin
 
   let body: Record<string, unknown>
   try {
@@ -49,6 +61,9 @@ export async function POST(request: Request): Promise<Response> {
     return json({ error: 'missing_fields' }, 400)
   }
   if (!CATS.has(categoria)) return json({ error: 'invalid_categoria' }, 400)
+  if (!canAccessFilho(session, filhoId)) {
+    return json({ error: 'forbidden' }, 403)
+  }
 
   const diaRaw = body.diaVencimento ?? body.dia_vencimento
   const dia =

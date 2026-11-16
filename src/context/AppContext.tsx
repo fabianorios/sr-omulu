@@ -13,6 +13,7 @@ import {
   createSampleFilhos,
   DEFAULT_COBRANCA_TIPOS,
 } from '../data/mock'
+import { useAuth } from './AuthContext'
 import {
   createCobrancaTipoViaApi,
   createCobrancaViaApi,
@@ -45,6 +46,8 @@ import type {
   ObligationTypeId,
   Obrigacao,
 } from '../types'
+
+// Cobranca used in sample scoping helper
 
 interface AppContextValue {
   state: AppState
@@ -99,7 +102,25 @@ function applyLocalUpdate(
   return list.map((f) => (f.id === id ? { ...f, ...patch, id } : f))
 }
 
+function scopeSampleForUser(
+  userFilhoId: string | null | undefined,
+  isAdmin: boolean,
+  filhos: Filho[],
+  obrigacoes: Obrigacao[],
+  cobrancas: Cobranca[],
+) {
+  if (isAdmin || !userFilhoId) {
+    return { filhos, obrigacoes, cobrancas }
+  }
+  return {
+    filhos: filhos.filter((f) => f.id === userFilhoId),
+    obrigacoes: obrigacoes.filter((o) => o.filhoId === userFilhoId),
+    cobrancas: cobrancas.filter((c) => c.filhoId === userFilhoId),
+  }
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
+  const { user, isAdmin } = useAuth()
   const [state, setState] = useState<AppState>(() => createInitialState())
   const [loadingFilhos, setLoadingFilhos] = useState(true)
   const [openNovoFilho, setOpenNovoFilho] = useState(false)
@@ -118,19 +139,42 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ])
       if (cancelled) return
 
+      // Unauthorized: do not hydrate PII samples into the client
+      if (
+        remoteFilhos.source === 'error' &&
+        remoteFilhos.error === 'unauthorized'
+      ) {
+        setState((prev) => ({
+          ...prev,
+          filhos: [],
+          obrigacoes: [],
+          cobrancas: [],
+          dataSource: 'local',
+        }))
+        setLoadingFilhos(false)
+        return
+      }
+
       setState((prev) => {
         let next: AppState = { ...prev }
+        const initial = createInitialState()
 
         if (
           remoteFilhos.source === 'postgres' ||
           remoteFilhos.source === 'pglite'
         ) {
           if (remoteFilhos.filhos.length === 0) {
-            const local = loadLocalFilhos()
-            next = {
-              ...next,
-              filhos: local.length > 0 ? local : createSampleFilhos(),
-              dataSource: local.length > 0 ? 'local' : 'sample',
+            if (isAdmin) {
+              const local = loadLocalFilhos()
+              const filhos =
+                local.length > 0 ? local : createSampleFilhos()
+              next = {
+                ...next,
+                filhos,
+                dataSource: local.length > 0 ? 'local' : 'sample',
+              }
+            } else {
+              next = { ...next, filhos: [], dataSource: remoteFilhos.source }
             }
           } else {
             next = {
@@ -139,13 +183,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
               dataSource: remoteFilhos.source,
             }
           }
-        } else {
+        } else if (isAdmin) {
           const local = loadLocalFilhos()
           next = {
             ...next,
             filhos: local.length > 0 ? local : createSampleFilhos(),
             dataSource: local.length > 0 ? 'local' : 'sample',
           }
+        } else {
+          next = { ...next, filhos: [], dataSource: 'local' }
         }
 
         if (
@@ -153,8 +199,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
           remoteObr.obrigacoes.length > 0
         ) {
           next = { ...next, obrigacoes: remoteObr.obrigacoes }
+        } else if (next.dataSource === 'sample' && isAdmin) {
+          next = { ...next, obrigacoes: initial.obrigacoes }
+        } else if (!isAdmin) {
+          next = { ...next, obrigacoes: [] }
         }
-        // else keep seeded sample obrigações for demo
 
         if (
           remoteFin.source === 'postgres' ||
@@ -163,16 +212,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
           if (remoteFin.tipos.length > 0) {
             next = { ...next, cobrancaTipos: remoteFin.tipos }
           }
-          // Empty DB: keep demo cobrancas when viewing sample filhos
           if (remoteFin.cobrancas.length > 0) {
             next = { ...next, cobrancas: remoteFin.cobrancas }
-          } else if (next.dataSource === 'sample') {
+          } else if (next.dataSource === 'sample' && isAdmin) {
             next = { ...next, cobrancas: createSampleCobrancas() }
+          } else if (!isAdmin) {
+            next = { ...next, cobrancas: [] }
           } else {
             const localC = loadLocalCobrancas()
             if (localC.length > 0) next = { ...next, cobrancas: localC }
           }
-        } else {
+        } else if (isAdmin) {
           const localC = loadLocalCobrancas()
           next = {
             ...next,
@@ -180,16 +230,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
               localC.length > 0 ? localC : createSampleCobrancas(),
             cobrancaTipos: DEFAULT_COBRANCA_TIPOS.map((t) => ({ ...t })),
           }
+        } else {
+          next = {
+            ...next,
+            cobrancas: [],
+            cobrancaTipos: DEFAULT_COBRANCA_TIPOS.map((t) => ({ ...t })),
+          }
         }
 
-        return next
+        const scoped = scopeSampleForUser(
+          user?.filhoId,
+          isAdmin,
+          next.filhos,
+          next.obrigacoes,
+          next.cobrancas,
+        )
+        return { ...next, ...scoped }
       })
       setLoadingFilhos(false)
     })()
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [user?.id, user?.filhoId, isAdmin])
 
   const resetDemo = useCallback(() => {
     const next = createInitialState()

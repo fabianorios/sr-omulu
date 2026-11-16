@@ -1,5 +1,12 @@
-import { requireIdentity } from '../cursor/identity'
-import { dbMode, json, sql } from '../lib/db'
+import {
+  canAccessFilho,
+  filhoIdScopeSql,
+  json,
+  requireAdmin,
+  requireAppSession,
+  sql,
+} from '../lib/auth'
+import { dbMode } from '../lib/db'
 
 type ObrigacaoRow = Record<string, unknown>
 
@@ -21,12 +28,14 @@ function parseItens(raw: unknown): { nome: string; quantidade: number }[] {
 }
 
 export async function GET(request: Request): Promise<Response> {
-  const identity = await requireIdentity(request)
-  if (identity instanceof Response) return identity
+  const session = await requireAppSession(request)
+  if (session instanceof Response) return session
 
   try {
+    const scope = filhoIdScopeSql(session)
     const obrigacoes = await sql<ObrigacaoRow>(
-      `select * from obrigacoes order by data asc`,
+      `select * from obrigacoes where true${scope.clause} order by data asc`,
+      scope.params,
     )
     return json({ source: dbMode(), obrigacoes })
   } catch (error) {
@@ -38,8 +47,10 @@ export async function GET(request: Request): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  const identity = await requireIdentity(request)
-  if (identity instanceof Response) return identity
+  const session = await requireAppSession(request)
+  if (session instanceof Response) return session
+  const admin = requireAdmin(session)
+  if (admin instanceof Response) return admin
 
   let body: Record<string, unknown>
   try {
@@ -53,6 +64,9 @@ export async function POST(request: Request): Promise<Response> {
   const data = String(body.data ?? '').trim().slice(0, 10)
   if (!filhoId || !tipoId || !data) {
     return json({ error: 'missing_fields' }, 400)
+  }
+  if (!canAccessFilho(session, filhoId)) {
+    return json({ error: 'forbidden' }, 403)
   }
 
   const itens = parseItens(body.itens)

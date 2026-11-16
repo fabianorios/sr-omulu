@@ -1,7 +1,13 @@
-import { requireIdentity } from '../../cursor/identity'
-import { dbMode, json, sql } from '../../lib/db'
+import {
+  canAccessFilho,
+  json,
+  requireAdmin,
+  requireAppSession,
+  sql,
+} from '../../lib/auth'
+import { dbMode } from '../../lib/db'
 
-type CobrancaRow = Record<string, unknown>
+type CobrancaRow = Record<string, unknown> & { filho_id?: string }
 const CATS = new Set(['mensalidade', 'contribuicao', 'outro'])
 
 function idFromUrl(request: Request): string | null {
@@ -10,18 +16,38 @@ function idFromUrl(request: Request): string | null {
   return last && last !== 'cobrancas' ? decodeURIComponent(last) : null
 }
 
+async function loadCobranca(id: string) {
+  const rows = await sql<CobrancaRow>(`select * from cobrancas where id = $1`, [
+    id,
+  ])
+  return rows[0] ?? null
+}
+
 export async function PATCH(request: Request): Promise<Response> {
-  const identity = await requireIdentity(request)
-  if (identity instanceof Response) return identity
+  const session = await requireAppSession(request)
+  if (session instanceof Response) return session
 
   const id = idFromUrl(request)
   if (!id) return json({ error: 'missing_id' }, 400)
+
+  const existing = await loadCobranca(id)
+  if (!existing) return json({ error: 'not_found' }, 404)
+  if (!canAccessFilho(session, String(existing.filho_id))) {
+    return json({ error: 'forbidden' }, 403)
+  }
 
   let body: Record<string, unknown>
   try {
     body = (await request.json()) as Record<string, unknown>
   } catch {
     return json({ error: 'invalid_json' }, 400)
+  }
+
+  const isAdmin = session.user.role === 'admin'
+  // Médium may only mark own charges as paid
+  if (!isAdmin) {
+    const keys = Object.keys(body).filter((k) => k !== 'pago')
+    if (keys.length > 0) return json({ error: 'forbidden' }, 403)
   }
 
   const sets: string[] = []
@@ -31,25 +57,25 @@ export async function PATCH(request: Request): Promise<Response> {
     sets.push(`${col} = $${params.length}`)
   }
 
-  if ('filhoId' in body || 'filho_id' in body) {
+  if (isAdmin && ('filhoId' in body || 'filho_id' in body)) {
     push('filho_id', String(body.filhoId ?? body.filho_id).trim())
   }
-  if ('tipoNome' in body || 'tipo_nome' in body) {
+  if (isAdmin && ('tipoNome' in body || 'tipo_nome' in body)) {
     push('tipo_nome', String(body.tipoNome ?? body.tipo_nome).trim())
   }
-  if ('tipoId' in body || 'tipo_id' in body) {
+  if (isAdmin && ('tipoId' in body || 'tipo_id' in body)) {
     push('tipo_id', emptyToNull(body.tipoId ?? body.tipo_id))
   }
-  if ('categoria' in body) {
+  if (isAdmin && 'categoria' in body) {
     const cat = String(body.categoria)
     if (!CATS.has(cat)) return json({ error: 'invalid_categoria' }, 400)
     push('categoria', cat)
   }
-  if ('valor' in body) push('valor', Number(body.valor))
-  if ('vencimento' in body) {
+  if (isAdmin && 'valor' in body) push('valor', Number(body.valor))
+  if (isAdmin && 'vencimento' in body) {
     push('vencimento', String(body.vencimento).slice(0, 10))
   }
-  if ('diaVencimento' in body || 'dia_vencimento' in body) {
+  if (isAdmin && ('diaVencimento' in body || 'dia_vencimento' in body)) {
     const raw = body.diaVencimento ?? body.dia_vencimento
     push(
       'dia_vencimento',
@@ -58,17 +84,17 @@ export async function PATCH(request: Request): Promise<Response> {
         : Math.min(28, Math.max(1, Number(raw))),
     )
   }
-  if ('referencia' in body) push('referencia', emptyToNull(body.referencia))
-  if ('descricao' in body) push('descricao', emptyToNull(body.descricao))
+  if (isAdmin && 'referencia' in body) {
+    push('referencia', emptyToNull(body.referencia))
+  }
+  if (isAdmin && 'descricao' in body) {
+    push('descricao', emptyToNull(body.descricao))
+  }
 
   if ('pago' in body) {
     const pago = body.pago === true
     push('pago', pago)
-    if (pago) {
-      push('pago_em', new Date().toISOString())
-    } else {
-      push('pago_em', null)
-    }
+    push('pago_em', pago ? new Date().toISOString() : null)
   }
 
   if (sets.length === 0) return json({ error: 'empty_patch' }, 400)
@@ -91,8 +117,10 @@ export async function PATCH(request: Request): Promise<Response> {
 }
 
 export async function DELETE(request: Request): Promise<Response> {
-  const identity = await requireIdentity(request)
-  if (identity instanceof Response) return identity
+  const session = await requireAppSession(request)
+  if (session instanceof Response) return session
+  const admin = requireAdmin(session)
+  if (admin instanceof Response) return admin
 
   const id = idFromUrl(request)
   if (!id) return json({ error: 'missing_id' }, 400)

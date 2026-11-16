@@ -1,5 +1,11 @@
-import { requireIdentity } from '../cursor/identity'
-import { dbMode, json, sql, type FilhoRow } from '../lib/db'
+import {
+  filhoScopeSql,
+  json,
+  requireAdmin,
+  requireAppSession,
+  sql,
+} from '../lib/auth'
+import { dbMode, type FilhoRow } from '../lib/db'
 
 const PAIS = new Set(['Ogum', 'Omulu', 'Oxossi', 'Xango'])
 const MAES = new Set(['Iansã', 'Iemanjá', 'Nanã Buruquê', 'Oxum'])
@@ -36,14 +42,16 @@ function parseEntidades(body: Record<string, unknown>): EntidadeIn[] {
 }
 
 export async function GET(request: Request): Promise<Response> {
-  const identity = await requireIdentity(request)
-  if (identity instanceof Response) return identity
+  const session = await requireAppSession(request)
+  if (session instanceof Response) return session
 
   try {
+    const scope = filhoScopeSql(session)
     const filhos = await sql<FilhoRow>(
-      `select * from filhos order by nome asc`,
+      `select * from filhos where true${scope.clause} order by nome asc`,
+      scope.params,
     )
-    return json({ source: dbMode(), filhos })
+    return json({ source: dbMode(), filhos, role: session.user.role })
   } catch (error) {
     return json(
       { error: error instanceof Error ? error.message : 'db_error' },
@@ -53,8 +61,10 @@ export async function GET(request: Request): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  const identity = await requireIdentity(request)
-  if (identity instanceof Response) return identity
+  const session = await requireAppSession(request)
+  if (session instanceof Response) return session
+  const admin = requireAdmin(session)
+  if (admin instanceof Response) return admin
 
   let body: Record<string, unknown>
   try {

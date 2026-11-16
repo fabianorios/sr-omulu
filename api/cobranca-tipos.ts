@@ -1,16 +1,14 @@
-import { requireIdentity } from '../cursor/identity'
-import { dbMode, json, sql } from '../lib/db'
+import { json, requireAdmin, requireAppSession, sql } from '../lib/auth'
+import { dbMode } from '../lib/db'
 
 const CATS = new Set(['mensalidade', 'contribuicao', 'outro'])
 
 export async function GET(request: Request): Promise<Response> {
-  const identity = await requireIdentity(request)
-  if (identity instanceof Response) return identity
+  const session = await requireAppSession(request)
+  if (session instanceof Response) return session
 
   try {
-    const tipos = await sql(
-      `select * from cobranca_tipos order by nome asc`,
-    )
+    const tipos = await sql(`select * from cobranca_tipos order by nome asc`)
     return json({ source: dbMode(), tipos })
   } catch (error) {
     return json(
@@ -21,8 +19,10 @@ export async function GET(request: Request): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  const identity = await requireIdentity(request)
-  if (identity instanceof Response) return identity
+  const session = await requireAppSession(request)
+  if (session instanceof Response) return session
+  const admin = requireAdmin(session)
+  if (admin instanceof Response) return admin
 
   let body: Record<string, unknown>
   try {

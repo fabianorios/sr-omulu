@@ -73,3 +73,26 @@ alter table public.filhos enable row level security;
 alter table public.cobranca_tipos enable row level security;
 alter table public.cobrancas enable row level security;
 alter table public.obrigacoes enable row level security;
+
+-- Auth (migrations/005)
+create table if not exists public.usuarios (
+  id uuid primary key default gen_random_uuid(),
+  nome text not null,
+  role text not null check (role in ('admin', 'medium')),
+  email text,
+  cpf text,
+  celular text,
+  password_hash text not null,
+  filho_id text,
+  ativo boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.sessoes (
+  id uuid primary key default gen_random_uuid(),
+  usuario_id uuid not null references public.usuarios (id) on delete cascade,
+  token_hash text not null unique,
+  expires_at timestamptz not null,
+  created_at timestamptz not null default now()
+);

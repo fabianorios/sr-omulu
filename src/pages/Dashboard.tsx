@@ -11,6 +11,7 @@ import { ptBR } from 'date-fns/locale'
 import { Link } from 'react-router-dom'
 import { REFERENCE_DATE } from '../data/mock'
 import { useApp } from '../context/AppContext'
+import { useAuth } from '../context/AuthContext'
 import { StatusBadge } from '../components/StatusBadge'
 import {
   countFilhosDevedores,
@@ -30,6 +31,7 @@ import {
 export function Dashboard() {
   const { state, setOpenNovoFilho, setOpenAgendar, setOpenNovaCobranca } =
     useApp()
+  const { isAdmin } = useAuth()
   const alerts = buildAlerts(state.filhos, state.obrigacoes, state.tipos)
   const nextEvent = nextHouseEvent(state.eventos)
   const dueMonth = countDueThisMonth(state.obrigacoes)
@@ -99,32 +101,34 @@ export function Dashboard() {
           </p>
         </div>
 
-        <div className="animate-fade-in-delay-1 flex shrink-0 flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setOpenNovoFilho(true)}
-            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--color-forest)] bg-white/70 px-3.5 py-2 text-sm font-semibold text-[var(--color-forest)] transition hover:bg-[var(--color-parchment)]"
-          >
-            <UserPlus size={16} />
-            + Novo Filho
-          </button>
-          <button
-            type="button"
-            onClick={() => setOpenNovaCobranca(true)}
-            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--color-forest)] bg-white/70 px-3.5 py-2 text-sm font-semibold text-[var(--color-forest)] transition hover:bg-[var(--color-parchment)]"
-          >
-            <Wallet size={16} />
-            + Cobrança
-          </button>
-          <button
-            type="button"
-            onClick={() => setOpenAgendar(true)}
-            className="inline-flex items-center gap-1.5 rounded-md bg-[var(--color-forest)] px-3.5 py-2 text-sm font-semibold text-[var(--color-cream)] transition hover:bg-[var(--color-forest-hover)]"
-          >
-            <CalendarPlus size={16} />
-            + Agendar Obrigação
-          </button>
-        </div>
+        {isAdmin ? (
+          <div className="animate-fade-in-delay-1 flex shrink-0 flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setOpenNovoFilho(true)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-[var(--color-forest)] bg-white/70 px-3.5 py-2 text-sm font-semibold text-[var(--color-forest)] transition hover:bg-[var(--color-parchment)]"
+            >
+              <UserPlus size={16} />
+              + Novo Filho
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpenNovaCobranca(true)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-[var(--color-forest)] bg-white/70 px-3.5 py-2 text-sm font-semibold text-[var(--color-forest)] transition hover:bg-[var(--color-parchment)]"
+            >
+              <Wallet size={16} />
+              + Cobrança
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpenAgendar(true)}
+              className="inline-flex items-center gap-1.5 rounded-md bg-[var(--color-forest)] px-3.5 py-2 text-sm font-semibold text-[var(--color-cream)] transition hover:bg-[var(--color-forest-hover)]"
+            >
+              <CalendarPlus size={16} />
+              + Agendar Obrigação
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <div className="animate-fade-in-delay-1 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
