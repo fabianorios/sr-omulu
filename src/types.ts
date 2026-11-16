@@ -1,4 +1,4 @@
-import type { Guia, MaeDeCabeca, PaiDeCabeca } from './data/catalog'
+import type { MaeDeCabeca, PaiDeCabeca, TipoEntidade } from './data/catalog'
 
 export type ObligationStatus = 'em_dia' | 'proxima' | 'vencida'
 
@@ -30,12 +30,18 @@ export interface Endereco {
   uf: string
 }
 
+/** Uma linha: tipo de entidade + nome próprio. */
+export interface EntidadeLinha {
+  tipo: TipoEntidade
+  nome: string
+}
+
 export interface Filho {
   id: string
   nome: string
   paiDeCabeca: PaiDeCabeca
   maeDeCabeca: MaeDeCabeca
-  guias: Guia[]
+  entidades: EntidadeLinha[]
   dataNascimento: string
   dataEntrada: string
   iniciacao: string
@@ -82,4 +88,13 @@ export function emptyEndereco(): Endereco {
     cidade: '',
     uf: '',
   }
+}
+
+export function emptyEntidadeLinha(): EntidadeLinha {
+  return { tipo: 'Caboclo', nome: '' }
+}
+
+export function formatEntidade(e: EntidadeLinha): string {
+  const nome = e.nome.trim()
+  return nome ? `${e.tipo} (${nome})` : e.tipo
 }

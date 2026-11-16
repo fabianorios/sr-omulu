@@ -3,7 +3,7 @@ import { dbMode, json, sql, type FilhoRow } from '../lib/db'
 
 const PAIS = new Set(['Ogum', 'Omulu', 'Oxossi', 'Xango'])
 const MAES = new Set(['Iansã', 'Iemanjá', 'Nanã Buruquê', 'Oxum'])
-const GUIAS = new Set([
+const TIPOS = new Set([
   'Baiano',
   'Boiadeiro',
   'Caboclo',
@@ -17,6 +17,23 @@ const GUIAS = new Set([
   'Pomba-Gira',
   'Preto Velho',
 ])
+
+type EntidadeIn = { tipo: string; nome: string }
+
+function parseEntidades(body: Record<string, unknown>): EntidadeIn[] {
+  const raw = body.entidades
+  if (!Array.isArray(raw)) return []
+  const out: EntidadeIn[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const rec = item as Record<string, unknown>
+    const tipo = String(rec.tipo ?? '').trim()
+    const nome = String(rec.nome ?? '').trim()
+    if (!TIPOS.has(tipo)) continue
+    out.push({ tipo, nome })
+  }
+  return out
+}
 
 export async function GET(request: Request): Promise<Response> {
   const identity = await requireIdentity(request)
@@ -56,13 +73,7 @@ export async function POST(request: Request): Promise<Response> {
     return json({ error: 'invalid_pai_or_mae' }, 400)
   }
 
-  const guias = Array.isArray(body.guias)
-    ? body.guias
-        .map((g) => String(g).trim())
-        .filter((g) => GUIAS.has(g))
-        .sort((a, b) => a.localeCompare(b, 'pt-BR'))
-    : []
-
+  const entidades = parseEntidades(body)
   const endereco =
     body.endereco && typeof body.endereco === 'object'
       ? (body.endereco as Record<string, unknown>)
@@ -71,13 +82,13 @@ export async function POST(request: Request): Promise<Response> {
   try {
     const rows = await sql<FilhoRow>(
       `insert into filhos (
-        nome, orixa, pai_de_cabeca, mae_de_cabeca, guias,
+        nome, orixa, pai_de_cabeca, mae_de_cabeca, guias, entidades,
         data_nascimento, data_entrada, iniciacao,
         telefone1, telefone2, email,
         endereco_cep, endereco_logradouro, endereco_numero,
         endereco_complemento, endereco_bairro, endereco_cidade, endereco_uf
       ) values (
-        $1,'',$2,$3,$4::text[],
+        $1,'',$2,$3,'{}'::text[],$4::jsonb,
         $5,$6,$7,
         $8,$9,$10,
         $11,$12,$13,
@@ -88,7 +99,7 @@ export async function POST(request: Request): Promise<Response> {
         nome,
         pai,
         mae,
-        guias,
+        JSON.stringify(entidades),
         emptyToNull(body.dataNascimento ?? body.data_nascimento),
         emptyToNull(body.dataEntrada ?? body.data_entrada),
         emptyToNull(body.iniciacao),

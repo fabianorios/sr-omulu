@@ -1,5 +1,5 @@
 -- Supabase-equivalent reference (keep in sync with migrations/).
--- Active Cursor Postgres schema: migrations/001_create_filhos.sql + 002_*.
+-- Active Cursor Postgres schema: migrations/001 + 002 + 003.
 
 create extension if not exists "pgcrypto";
 
@@ -10,6 +10,7 @@ create table if not exists public.filhos (
   pai_de_cabeca text,
   mae_de_cabeca text,
   guias text[] not null default '{}',
+  entidades jsonb not null default '[]'::jsonb,
   data_nascimento date,
   data_entrada date,
   iniciacao date,

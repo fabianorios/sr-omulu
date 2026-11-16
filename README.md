@@ -23,7 +23,7 @@ npm run preview
 ## Database
 
 - Declare: `cursor-app.json` `{ "database": "postgres" }`
-- Migration: `migrations/001_create_filhos.sql`
+- Migrations: `migrations/001_create_filhos.sql`, `002_*`, `003_filhos_entidades.jsonb.sql`
 - Local API uses **PGlite** when `DATABASE_URL` is unset
 - Production DB is provisioned on **private/team publish** (platform sets `DATABASE_URL`)
 
@@ -31,7 +31,7 @@ Do not commit or paste `DATABASE_URL`.
 
 ## Cadastro de filhos
 
-Pai/mãe de cabeça (listas fixas A–Z), guias multi-select (lista fixa A–Z), nascimento, entrada no terreiro, iniciação, até 2 telefones, endereço + CEP (ViaCEP).
+Pai/mãe de cabeça (listas fixas A–Z). Entidades: linhas Entidade (select A–Z) + Nome (texto livre); o mesmo tipo pode repetir com nomes diferentes. Nascimento, entrada no terreiro, iniciação, até 2 telefones, endereço + CEP (ViaCEP).
 
 ## Publicação
 

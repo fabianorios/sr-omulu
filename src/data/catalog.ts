@@ -9,7 +9,7 @@ export const MAES_DE_CABECA = [
   'Oxum',
 ] as const
 
-export const GUIAS = [
+export const TIPOS_ENTIDADE = [
   'Baiano',
   'Boiadeiro',
   'Caboclo',
@@ -26,7 +26,7 @@ export const GUIAS = [
 
 export type PaiDeCabeca = (typeof PAIS_DE_CABECA)[number]
 export type MaeDeCabeca = (typeof MAES_DE_CABECA)[number]
-export type Guia = (typeof GUIAS)[number]
+export type TipoEntidade = (typeof TIPOS_ENTIDADE)[number]
 
 export function isPaiDeCabeca(value: string): value is PaiDeCabeca {
   return (PAIS_DE_CABECA as readonly string[]).includes(value)
@@ -36,7 +36,6 @@ export function isMaeDeCabeca(value: string): value is MaeDeCabeca {
   return (MAES_DE_CABECA as readonly string[]).includes(value)
 }
 
-export function filterValidGuias(values: string[]): Guia[] {
-  const allowed = new Set<string>(GUIAS)
-  return values.filter((v): v is Guia => allowed.has(v))
+export function isTipoEntidade(value: string): value is TipoEntidade {
+  return (TIPOS_ENTIDADE as readonly string[]).includes(value)
 }

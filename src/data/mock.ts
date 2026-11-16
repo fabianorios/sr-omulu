@@ -1,6 +1,6 @@
-import type { AppState, Filho, ObligationType } from '../types'
+import type { AppState, EntidadeLinha, Filho, ObligationType } from '../types'
 import { emptyEndereco } from '../types'
-import type { Guia, MaeDeCabeca, PaiDeCabeca } from './catalog'
+import type { MaeDeCabeca, PaiDeCabeca, TipoEntidade } from './catalog'
 
 export const DEFAULT_TIPOS: ObligationType[] = [
   {
@@ -75,13 +75,17 @@ function sample(
   }
 }
 
+function e(tipo: TipoEntidade, nome: string): EntidadeLinha {
+  return { tipo, nome }
+}
+
 /** Dados de exemplo anonimizados (não são pessoas reais). */
 export function createSampleFilhos(): Filho[] {
   const rows: Array<{
     id: string
     pai: PaiDeCabeca
     mae: MaeDeCabeca
-    guias: Guia[]
+    entidades: EntidadeLinha[]
     iniciacao: string
     entrada: string
     nasc: string
@@ -92,7 +96,7 @@ export function createSampleFilhos(): Filho[] {
       id: 'f1',
       pai: 'Omulu',
       mae: 'Nanã Buruquê',
-      guias: ['Caboclo', 'Preto Velho'],
+      entidades: [e('Caboclo', 'Sete Flechas'), e('Preto Velho', 'Pai Joaquim')],
       iniciacao: '2019-08-12',
       entrada: '2018-03-10',
       nasc: '1992-05-14',
@@ -102,7 +106,7 @@ export function createSampleFilhos(): Filho[] {
       id: 'f2',
       pai: 'Ogum',
       mae: 'Iansã',
-      guias: ['Exu'],
+      entidades: [e('Exu', 'Tranca Rua')],
       iniciacao: '2017-03-22',
       entrada: '2016-01-15',
       nasc: '1988-02-01',
@@ -112,7 +116,7 @@ export function createSampleFilhos(): Filho[] {
       id: 'f3',
       pai: 'Oxossi',
       mae: 'Iemanjá',
-      guias: ['Marinheiro', 'Marujo'],
+      entidades: [e('Marinheiro', 'João do Mar'), e('Marujo', 'Zé do Cais')],
       iniciacao: '2021-02-02',
       entrada: '2020-08-01',
       nasc: '1995-11-20',
@@ -122,7 +126,7 @@ export function createSampleFilhos(): Filho[] {
       id: 'f4',
       pai: 'Xango',
       mae: 'Oxum',
-      guias: ['Boiadeiro'],
+      entidades: [e('Boiadeiro', 'Zé Mineiro')],
       iniciacao: '2015-11-08',
       entrada: '2014-06-20',
       nasc: '1985-07-09',
@@ -132,7 +136,7 @@ export function createSampleFilhos(): Filho[] {
       id: 'f5',
       pai: 'Oxossi',
       mae: 'Oxum',
-      guias: ['Cigano'],
+      entidades: [e('Cigano', 'Wenceslau')],
       iniciacao: '2020-06-15',
       entrada: '2019-11-02',
       nasc: '1993-03-18',
@@ -142,7 +146,7 @@ export function createSampleFilhos(): Filho[] {
       id: 'f6',
       pai: 'Omulu',
       mae: 'Nanã Buruquê',
-      guias: ['Baiano'],
+      entidades: [e('Baiano', 'Zé Pelintra')],
       iniciacao: '2018-01-20',
       entrada: '2017-04-12',
       nasc: '1990-09-30',
@@ -152,7 +156,7 @@ export function createSampleFilhos(): Filho[] {
       id: 'f7',
       pai: 'Ogum',
       mae: 'Iansã',
-      guias: ['Pomba-Gira'],
+      entidades: [e('Pomba-Gira', 'Maria Padilha')],
       iniciacao: '2022-09-30',
       entrada: '2022-01-08',
       nasc: '1998-12-05',
@@ -162,7 +166,7 @@ export function createSampleFilhos(): Filho[] {
       id: 'f8',
       pai: 'Oxossi',
       mae: 'Oxum',
-      guias: ['Caboclo'],
+      entidades: [e('Caboclo', 'Arranca Toco')],
       iniciacao: '2016-05-04',
       entrada: '2015-09-18',
       nasc: '1987-06-22',
@@ -172,7 +176,7 @@ export function createSampleFilhos(): Filho[] {
       id: 'f9',
       pai: 'Omulu',
       mae: 'Nanã Buruquê',
-      guias: ['Preto Velho'],
+      entidades: [e('Preto Velho', 'Vovó Catarina')],
       iniciacao: '2014-12-18',
       entrada: '2013-07-22',
       nasc: '1982-01-11',
@@ -182,7 +186,7 @@ export function createSampleFilhos(): Filho[] {
       id: 'f10',
       pai: 'Omulu',
       mae: 'Iemanjá',
-      guias: ['Erê'],
+      entidades: [e('Erê', 'Curumim')],
       iniciacao: '2023-04-07',
       entrada: '2022-12-01',
       nasc: '2000-08-08',
@@ -192,7 +196,7 @@ export function createSampleFilhos(): Filho[] {
       id: 'f11',
       pai: 'Ogum',
       mae: 'Oxum',
-      guias: ['Malandro'],
+      entidades: [e('Malandro', 'Zé do Morro')],
       iniciacao: '2019-11-25',
       entrada: '2019-02-14',
       nasc: '1991-04-04',
@@ -202,7 +206,11 @@ export function createSampleFilhos(): Filho[] {
       id: 'f12',
       pai: 'Xango',
       mae: 'Oxum',
-      guias: ['Cigano', 'Marinheiro'],
+      entidades: [
+        e('Cigano', 'Cigano Pablo'),
+        e('Marinheiro', 'Marinheiro Antônio'),
+        e('Cigano', 'Cigana Esmeralda'),
+      ],
       iniciacao: '2021-07-14',
       entrada: '2020-10-30',
       nasc: '1994-10-16',
@@ -217,7 +225,7 @@ export function createSampleFilhos(): Filho[] {
       nome: `Médium Exemplo ${String(i + 1).padStart(2, '0')}`,
       paiDeCabeca: r.pai,
       maeDeCabeca: r.mae,
-      guias: r.guias,
+      entidades: r.entidades,
       iniciacao: r.iniciacao,
       dataEntrada: r.entrada,
       dataNascimento: r.nasc,

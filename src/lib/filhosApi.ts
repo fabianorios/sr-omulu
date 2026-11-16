@@ -1,12 +1,12 @@
 import {
-  filterValidGuias,
   isMaeDeCabeca,
   isPaiDeCabeca,
   type MaeDeCabeca,
   type PaiDeCabeca,
 } from '../data/catalog'
-import type { Filho, FilhoInput } from '../types'
+import type { EntidadeLinha, Filho, FilhoInput } from '../types'
 import { emptyEndereco } from '../types'
+import { normalizeEntidades, sanitizeEntidadesForSave } from './entidades'
 
 /** Shape returned by /api/filhos (snake_case from Postgres). */
 export type FilhoRow = {
@@ -15,7 +15,8 @@ export type FilhoRow = {
   orixa?: string | null
   pai_de_cabeca: string | null
   mae_de_cabeca: string | null
-  guias: string[] | null
+  guias?: string[] | null
+  entidades?: unknown
   data_nascimento: string | null
   data_entrada: string | null
   iniciacao: string | null
@@ -31,7 +32,7 @@ export type FilhoRow = {
   endereco_uf: string | null
 }
 
-const LOCAL_KEY = 'sr-omulu.filhos.v2'
+const LOCAL_KEY = 'sr-omulu.filhos.v3'
 
 function asDateInput(value: string | null | undefined): string {
   if (!value) return ''
@@ -48,13 +49,19 @@ function fallbackMae(raw: string | null | undefined): MaeDeCabeca {
   return 'Oxum'
 }
 
+function entidadesFromRow(row: FilhoRow): EntidadeLinha[] {
+  const fromJson = normalizeEntidades(row.entidades)
+  if (fromJson.length > 0) return fromJson
+  return normalizeEntidades(row.guias ?? [])
+}
+
 export function rowToFilho(row: FilhoRow): Filho {
   return {
     id: row.id,
     nome: row.nome,
     paiDeCabeca: fallbackPai(row.pai_de_cabeca),
     maeDeCabeca: fallbackMae(row.mae_de_cabeca),
-    guias: filterValidGuias(row.guias ?? []),
+    entidades: entidadesFromRow(row),
     dataNascimento: asDateInput(row.data_nascimento),
     dataEntrada: asDateInput(row.data_entrada),
     iniciacao: asDateInput(row.iniciacao),
@@ -78,9 +85,7 @@ export function filhoToPayload(filho: FilhoInput) {
     nome: filho.nome,
     paiDeCabeca: filho.paiDeCabeca,
     maeDeCabeca: filho.maeDeCabeca,
-    guias: filterValidGuias(filho.guias).sort((a, b) =>
-      a.localeCompare(b, 'pt-BR'),
-    ),
+    entidades: sanitizeEntidadesForSave(filho.entidades),
     dataNascimento: filho.dataNascimento,
     dataEntrada: filho.dataEntrada,
     iniciacao: filho.iniciacao,
@@ -185,13 +190,18 @@ export function loadLocalFilhos(): Filho[] {
   try {
     const raw = localStorage.getItem(LOCAL_KEY)
     if (!raw) return []
-    const parsed = JSON.parse(raw) as Filho[]
+    const parsed = JSON.parse(raw) as Array<
+      Filho & { guias?: string[]; entidades?: EntidadeLinha[] }
+    >
     if (!Array.isArray(parsed)) return []
     return parsed.map((f) => ({
       ...f,
       paiDeCabeca: fallbackPai(f.paiDeCabeca),
       maeDeCabeca: fallbackMae(f.maeDeCabeca),
-      guias: filterValidGuias(f.guias ?? []),
+      entidades:
+        f.entidades && f.entidades.length > 0
+          ? normalizeEntidades(f.entidades)
+          : normalizeEntidades(f.guias ?? []),
     }))
   } catch {
     return []

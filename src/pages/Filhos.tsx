@@ -8,6 +8,7 @@ import {
   nextObligationForFilho,
 } from '../utils/status'
 import type { Filho } from '../types'
+import { formatEntidade } from '../types'
 
 export function Filhos() {
   const {
@@ -33,7 +34,7 @@ export function Filhos() {
           f.nome,
           f.paiDeCabeca,
           f.maeDeCabeca,
-          ...f.guias,
+          ...f.entidades.map((e) => `${e.tipo} ${e.nome}`),
           f.endereco.cidade,
         ]
           .join(' ')
@@ -70,8 +71,8 @@ export function Filhos() {
             Lista de Filhos
           </h2>
           <p className="mt-2 text-sm text-[var(--color-ink-muted)]">
-            Cadastro completo: pai/mãe de cabeça, guias, datas, telefones e
-            endereço. Busque por nome, pai, mãe ou guia.
+            Cadastro completo: pai/mãe de cabeça, entidades, datas, telefones e
+            endereço. Busque por nome, pai, mãe ou entidade.
           </p>
         </div>
         <button
@@ -95,7 +96,7 @@ export function Filhos() {
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar por nome, pai, mãe, guia ou cidade..."
+          placeholder="Buscar por nome, pai, mãe, entidade ou cidade..."
           className="w-full rounded-md border border-[var(--color-border)] bg-white/80 py-2.5 pr-4 pl-10 text-sm outline-none focus:border-[var(--color-forest)] focus:ring-2 focus:ring-[var(--color-forest)]/15"
         />
       </div>
@@ -118,9 +119,10 @@ export function Filhos() {
                 <p className="mt-0.5 text-sm text-[var(--color-ink-muted)]">
                   Pai {filho.paiDeCabeca} · Mãe {filho.maeDeCabeca}
                 </p>
-                {filho.guias.length > 0 ? (
+                {filho.entidades.length > 0 ? (
                   <p className="mt-1 text-xs text-[var(--color-ink-faint)]">
-                    Guias: {filho.guias.join(', ')}
+                    Entidades:{' '}
+                    {filho.entidades.map(formatEntidade).join(', ')}
                   </p>
                 ) : null}
               </div>
@@ -183,7 +185,7 @@ export function Filhos() {
             <tr className="border-b border-[var(--color-border-soft)] text-[11px] tracking-wide text-[var(--color-ink-faint)] uppercase">
               <th className="px-4 py-3 font-semibold">Nome</th>
               <th className="px-4 py-3 font-semibold">Pai / Mãe</th>
-              <th className="px-4 py-3 font-semibold">Guias</th>
+              <th className="px-4 py-3 font-semibold">Entidades</th>
               <th className="px-4 py-3 font-semibold">Datas</th>
               <th className="px-4 py-3 font-semibold">Telefones</th>
               <th className="px-4 py-3 font-semibold">Cidade</th>
@@ -203,8 +205,10 @@ export function Filhos() {
                     Mãe {filho.maeDeCabeca}
                   </div>
                 </td>
-                <td className="max-w-[160px] px-4 py-3.5 text-xs text-[var(--color-ink-muted)]">
-                  {filho.guias.length ? filho.guias.join(', ') : '—'}
+                <td className="max-w-[200px] px-4 py-3.5 text-xs text-[var(--color-ink-muted)]">
+                  {filho.entidades.length
+                    ? filho.entidades.map(formatEntidade).join(', ')
+                    : '—'}
                 </td>
                 <td className="px-4 py-3.5 text-xs text-[var(--color-ink-muted)]">
                   <div>Nasc. {formatBR(filho.dataNascimento)}</div>
@@ -280,9 +284,9 @@ export function Filhos() {
               <div>Pai de cabeça: {detailFilho.paiDeCabeca}</div>
               <div>Mãe de cabeça: {detailFilho.maeDeCabeca}</div>
               <div>
-                Guias:{' '}
-                {detailFilho.guias.length
-                  ? detailFilho.guias.join(', ')
+                Entidades:{' '}
+                {detailFilho.entidades.length
+                  ? detailFilho.entidades.map(formatEntidade).join(', ')
                   : '—'}
               </div>
               <div>Nascimento: {formatBR(detailFilho.dataNascimento)}</div>

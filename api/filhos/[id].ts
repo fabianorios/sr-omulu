@@ -3,7 +3,7 @@ import { dbMode, json, sql, type FilhoRow } from '../../lib/db'
 
 const PAIS = new Set(['Ogum', 'Omulu', 'Oxossi', 'Xango'])
 const MAES = new Set(['Iansã', 'Iemanjá', 'Nanã Buruquê', 'Oxum'])
-const GUIAS = new Set([
+const TIPOS = new Set([
   'Baiano',
   'Boiadeiro',
   'Caboclo',
@@ -23,6 +23,21 @@ function idFromUrl(request: Request): string | null {
   const parts = url.pathname.split('/').filter(Boolean)
   const last = parts[parts.length - 1]
   return last && last !== 'filhos' ? decodeURIComponent(last) : null
+}
+
+function parseEntidades(body: Record<string, unknown>) {
+  const raw = body.entidades
+  if (!Array.isArray(raw)) return null
+  const out: { tipo: string; nome: string }[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const rec = item as Record<string, unknown>
+    const tipo = String(rec.tipo ?? '').trim()
+    const nome = String(rec.nome ?? '').trim()
+    if (!TIPOS.has(tipo)) continue
+    out.push({ tipo, nome })
+  }
+  return out
 }
 
 export async function GET(request: Request): Promise<Response> {
@@ -77,14 +92,15 @@ export async function PATCH(request: Request): Promise<Response> {
     if (!MAES.has(mae)) return json({ error: 'invalid_mae' }, 400)
     push('mae_de_cabeca', mae)
   }
-  if (Array.isArray(body.guias)) {
-    const guias = body.guias
-      .map((g) => String(g).trim())
-      .filter((g) => GUIAS.has(g))
-      .sort((a, b) => a.localeCompare(b, 'pt-BR'))
-    params.push(guias)
+
+  const entidades = parseEntidades(body)
+  if (entidades) {
+    params.push(JSON.stringify(entidades))
+    sets.push(`entidades = $${params.length}::jsonb`)
+    params.push([])
     sets.push(`guias = $${params.length}::text[]`)
   }
+
   if ('dataNascimento' in body || 'data_nascimento' in body) {
     push(
       'data_nascimento',
@@ -130,8 +146,7 @@ export async function PATCH(request: Request): Promise<Response> {
     push('endereco_uf', emptyToNull(endereco?.uf ?? body.endereco_uf))
   }
 
-  // Clear legacy orixá field when updating spiritual lineage
-  if ('paiDeCabeca' in body || 'maeDeCabeca' in body || Array.isArray(body.guias)) {
+  if ('paiDeCabeca' in body || 'maeDeCabeca' in body || entidades) {
     push('orixa', '')
   }
 
