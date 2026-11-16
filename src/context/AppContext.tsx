@@ -7,7 +7,20 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { createInitialState, createSampleFilhos } from '../data/mock'
+import {
+  createInitialState,
+  createSampleCobrancas,
+  createSampleFilhos,
+  DEFAULT_COBRANCA_TIPOS,
+} from '../data/mock'
+import {
+  createCobrancaTipoViaApi,
+  createCobrancaViaApi,
+  loadCobrancasFromApi,
+  loadLocalCobrancas,
+  saveLocalCobrancas,
+  updateCobrancaViaApi,
+} from '../lib/cobrancasApi'
 import {
   createFilhoViaApi,
   loadFilhosFromApi,
@@ -15,8 +28,17 @@ import {
   saveLocalFilhos,
   updateFilhoViaApi,
 } from '../lib/filhosApi'
+import {
+  createObrigacaoViaApi,
+  loadObrigacoesFromApi,
+  updateObrigacaoViaApi,
+} from '../lib/obrigacoesApi'
 import type {
   AppState,
+  Cobranca,
+  CobrancaCategoria,
+  CobrancaInput,
+  CobrancaTipo,
   Filho,
   FilhoInput,
   ObligationType,
@@ -33,15 +55,34 @@ interface AppContextValue {
     id: string,
     filho: FilhoInput,
   ) => Promise<{ ok: boolean; error?: string }>
-  addObrigacao: (obrigacao: Omit<Obrigacao, 'id'> & { id?: string }) => void
+  addObrigacao: (
+    obrigacao: Omit<Obrigacao, 'id'> & { id?: string },
+  ) => Promise<{ ok: boolean; error?: string }>
+  updateObrigacao: (
+    id: string,
+    patch: Partial<Obrigacao>,
+  ) => Promise<{ ok: boolean; error?: string }>
   toggleTipo: (id: ObligationTypeId) => void
   updateTipo: (id: ObligationTypeId, patch: Partial<ObligationType>) => void
+  addCobranca: (
+    cobranca: CobrancaInput,
+  ) => Promise<{ ok: boolean; error?: string }>
+  markCobrancaPago: (
+    id: string,
+    pago: boolean,
+  ) => Promise<{ ok: boolean; error?: string }>
+  addCobrancaTipo: (input: {
+    nome: string
+    categoria: CobrancaCategoria
+  }) => Promise<{ ok: boolean; error?: string; tipo?: CobrancaTipo }>
   openNovoFilho: boolean
   editingFilho: Filho | null
   openAgendar: boolean
+  openNovaCobranca: boolean
   setOpenNovoFilho: (v: boolean) => void
   setEditingFilho: (filho: Filho | null) => void
   setOpenAgendar: (v: boolean) => void
+  setOpenNovaCobranca: (v: boolean) => void
 }
 
 const AppContext = createContext<AppContextValue | null>(null)
@@ -64,37 +105,85 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [openNovoFilho, setOpenNovoFilho] = useState(false)
   const [editingFilho, setEditingFilho] = useState<Filho | null>(null)
   const [openAgendar, setOpenAgendar] = useState(false)
+  const [openNovaCobranca, setOpenNovaCobranca] = useState(false)
 
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       setLoadingFilhos(true)
-      const remote = await loadFilhosFromApi()
+      const [remoteFilhos, remoteObr, remoteFin] = await Promise.all([
+        loadFilhosFromApi(),
+        loadObrigacoesFromApi(),
+        loadCobrancasFromApi(),
+      ])
       if (cancelled) return
 
-      if (remote.source === 'postgres' || remote.source === 'pglite') {
-        if (remote.filhos.length === 0) {
+      setState((prev) => {
+        let next: AppState = { ...prev }
+
+        if (
+          remoteFilhos.source === 'postgres' ||
+          remoteFilhos.source === 'pglite'
+        ) {
+          if (remoteFilhos.filhos.length === 0) {
+            const local = loadLocalFilhos()
+            next = {
+              ...next,
+              filhos: local.length > 0 ? local : createSampleFilhos(),
+              dataSource: local.length > 0 ? 'local' : 'sample',
+            }
+          } else {
+            next = {
+              ...next,
+              filhos: remoteFilhos.filhos,
+              dataSource: remoteFilhos.source,
+            }
+          }
+        } else {
           const local = loadLocalFilhos()
-          setState((prev) => ({
-            ...prev,
+          next = {
+            ...next,
             filhos: local.length > 0 ? local : createSampleFilhos(),
             dataSource: local.length > 0 ? 'local' : 'sample',
-          }))
-        } else {
-          setState((prev) => ({
-            ...prev,
-            filhos: remote.filhos,
-            dataSource: remote.source,
-          }))
+          }
         }
-      } else {
-        const local = loadLocalFilhos()
-        setState((prev) => ({
-          ...prev,
-          filhos: local.length > 0 ? local : createSampleFilhos(),
-          dataSource: local.length > 0 ? 'local' : 'sample',
-        }))
-      }
+
+        if (
+          (remoteObr.source === 'postgres' || remoteObr.source === 'pglite') &&
+          remoteObr.obrigacoes.length > 0
+        ) {
+          next = { ...next, obrigacoes: remoteObr.obrigacoes }
+        }
+        // else keep seeded sample obrigações for demo
+
+        if (
+          remoteFin.source === 'postgres' ||
+          remoteFin.source === 'pglite'
+        ) {
+          if (remoteFin.tipos.length > 0) {
+            next = { ...next, cobrancaTipos: remoteFin.tipos }
+          }
+          // Empty DB: keep demo cobrancas when viewing sample filhos
+          if (remoteFin.cobrancas.length > 0) {
+            next = { ...next, cobrancas: remoteFin.cobrancas }
+          } else if (next.dataSource === 'sample') {
+            next = { ...next, cobrancas: createSampleCobrancas() }
+          } else {
+            const localC = loadLocalCobrancas()
+            if (localC.length > 0) next = { ...next, cobrancas: localC }
+          }
+        } else {
+          const localC = loadLocalCobrancas()
+          next = {
+            ...next,
+            cobrancas:
+              localC.length > 0 ? localC : createSampleCobrancas(),
+            cobrancaTipos: DEFAULT_COBRANCA_TIPOS.map((t) => ({ ...t })),
+          }
+        }
+
+        return next
+      })
       setLoadingFilhos(false)
     })()
     return () => {
@@ -105,6 +194,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const resetDemo = useCallback(() => {
     const next = createInitialState()
     saveLocalFilhos([])
+    saveLocalCobrancas([])
     setState(next)
   }, [])
 
@@ -151,7 +241,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return { ok: true }
     }
 
-    // Sample/local ids (f1…) or offline: update in memory
     if (
       remote.error === 'not_found' ||
       remote.error === 'network' ||
@@ -178,14 +267,58 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const addObrigacao = useCallback(
-    (obrigacao: Omit<Obrigacao, 'id'> & { id?: string }) => {
+    async (obrigacao: Omit<Obrigacao, 'id'> & { id?: string }) => {
+      const payload = {
+        ...obrigacao,
+        itens: obrigacao.itens ?? [],
+      }
+      const remote = await createObrigacaoViaApi(payload)
+      if (remote.ok === true) {
+        setState((prev) => ({
+          ...prev,
+          obrigacoes: [...prev.obrigacoes, remote.obrigacao],
+        }))
+        return { ok: true }
+      }
+
+      if (
+        remote.error === 'network' ||
+        remote.error.startsWith('http_5') ||
+        remote.error.startsWith('http_')
+      ) {
+        setState((prev) => ({
+          ...prev,
+          obrigacoes: [
+            ...prev.obrigacoes,
+            { ...payload, id: obrigacao.id ?? uid('o') },
+          ],
+        }))
+        return { ok: true }
+      }
+      return { ok: false, error: remote.error }
+    },
+    [],
+  )
+
+  const updateObrigacao = useCallback(
+    async (id: string, patch: Partial<Obrigacao>) => {
+      const remote = await updateObrigacaoViaApi(id, patch)
+      if (remote.ok === true) {
+        setState((prev) => ({
+          ...prev,
+          obrigacoes: prev.obrigacoes.map((o) =>
+            o.id === id ? remote.obrigacao : o,
+          ),
+        }))
+        return { ok: true }
+      }
       setState((prev) => ({
         ...prev,
-        obrigacoes: [
-          ...prev.obrigacoes,
-          { ...obrigacao, id: obrigacao.id ?? uid('o') },
-        ],
+        obrigacoes: prev.obrigacoes.map((o) =>
+          o.id === id ? { ...o, ...patch, id } : o,
+        ),
       }))
+      return { ok: true }
     },
     [],
   )
@@ -209,6 +342,99 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [],
   )
 
+  const addCobranca = useCallback(async (cobranca: CobrancaInput) => {
+    const remote = await createCobrancaViaApi(cobranca)
+    if (remote.ok === true) {
+      setState((prev) => ({
+        ...prev,
+        cobrancas: [...prev.cobrancas, remote.cobranca],
+      }))
+      return { ok: true }
+    }
+
+    if (
+      remote.error === 'network' ||
+      remote.error.startsWith('http_5') ||
+      remote.error.startsWith('http_')
+    ) {
+      const created: Cobranca = {
+        ...cobranca,
+        id: cobranca.id ?? uid('c'),
+        pago: cobranca.pago ?? false,
+      }
+      setState((prev) => {
+        const cobrancas = [...prev.cobrancas, created]
+        saveLocalCobrancas(cobrancas)
+        return { ...prev, cobrancas }
+      })
+      return { ok: true }
+    }
+    return { ok: false, error: remote.error }
+  }, [])
+
+  const markCobrancaPago = useCallback(async (id: string, pago: boolean) => {
+    const remote = await updateCobrancaViaApi(id, { pago })
+    if (remote.ok === true) {
+      setState((prev) => ({
+        ...prev,
+        cobrancas: prev.cobrancas.map((c) =>
+          c.id === id ? remote.cobranca : c,
+        ),
+      }))
+      return { ok: true }
+    }
+    setState((prev) => {
+      const cobrancas = prev.cobrancas.map((c) =>
+        c.id === id
+          ? {
+              ...c,
+              pago,
+              pagoEm: pago ? new Date().toISOString() : undefined,
+            }
+          : c,
+      )
+      saveLocalCobrancas(cobrancas)
+      return { ...prev, cobrancas }
+    })
+    return { ok: true }
+  }, [])
+
+  const addCobrancaTipo = useCallback(
+    async (input: { nome: string; categoria: CobrancaCategoria }) => {
+      const remote = await createCobrancaTipoViaApi(input)
+      if (remote.ok === true) {
+        setState((prev) => {
+          const exists = prev.cobrancaTipos.some(
+            (t) => t.nome.toLowerCase() === remote.tipo.nome.toLowerCase(),
+          )
+          return {
+            ...prev,
+            cobrancaTipos: exists
+              ? prev.cobrancaTipos.map((t) =>
+                  t.nome.toLowerCase() === remote.tipo.nome.toLowerCase()
+                    ? remote.tipo
+                    : t,
+                )
+              : [...prev.cobrancaTipos, remote.tipo],
+          }
+        })
+        return { ok: true, tipo: remote.tipo }
+      }
+      const tipo: CobrancaTipo = {
+        id: uid('ct'),
+        nome: input.nome.trim(),
+        categoria: input.categoria,
+        ativo: true,
+      }
+      setState((prev) => ({
+        ...prev,
+        cobrancaTipos: [...prev.cobrancaTipos, tipo],
+      }))
+      return { ok: true, tipo }
+    },
+    [],
+  )
+
   const value = useMemo(
     () => ({
       state,
@@ -217,14 +443,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addFilho,
       updateFilho,
       addObrigacao,
+      updateObrigacao,
       toggleTipo,
       updateTipo,
+      addCobranca,
+      markCobrancaPago,
+      addCobrancaTipo,
       openNovoFilho,
       editingFilho,
       openAgendar,
+      openNovaCobranca,
       setOpenNovoFilho,
       setEditingFilho,
       setOpenAgendar,
+      setOpenNovaCobranca,
     }),
     [
       state,
@@ -233,11 +465,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addFilho,
       updateFilho,
       addObrigacao,
+      updateObrigacao,
       toggleTipo,
       updateTipo,
+      addCobranca,
+      markCobrancaPago,
+      addCobrancaTipo,
       openNovoFilho,
       editingFilho,
       openAgendar,
+      openNovaCobranca,
     ],
   )
 

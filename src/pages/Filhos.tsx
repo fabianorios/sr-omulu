@@ -8,7 +8,7 @@ import {
   nextObligationForFilho,
 } from '../utils/status'
 import type { Filho } from '../types'
-import { formatEntidade } from '../types'
+import { formatEntidade, formatObrigacaoItem } from '../types'
 
 export function Filhos() {
   const {
@@ -327,13 +327,19 @@ export function Filhos() {
                       key={o.id}
                       className="flex items-center justify-between gap-3 py-2.5"
                     >
-                      <div>
+                      <div className="min-w-0">
                         <p className="font-medium text-[var(--color-ink)]">
                           {tipo?.name ?? o.tipoId}
                         </p>
                         <p className="text-xs text-[var(--color-ink-muted)]">
                           {formatBR(o.data)}
                         </p>
+                        {o.itens?.length ? (
+                          <p className="mt-0.5 text-xs text-[var(--color-ink-faint)]">
+                            Itens:{' '}
+                            {o.itens.map(formatObrigacaoItem).join(', ')}
+                          </p>
+                        ) : null}
                       </div>
                       <StatusBadge status={getStatus(o.data)} />
                     </li>

@@ -1,10 +1,18 @@
 import { NavLink } from 'react-router-dom'
-import { CalendarDays, LayoutDashboard, Settings, Users, X } from 'lucide-react'
+import {
+  CalendarDays,
+  LayoutDashboard,
+  Settings,
+  Users,
+  Wallet,
+  X,
+} from 'lucide-react'
 import { Logo } from './Logo'
 
 const links = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/agenda', label: 'Agenda', icon: CalendarDays },
+  { to: '/financeiro', label: 'Agenda financeira', icon: Wallet },
   { to: '/filhos', label: 'Lista de Filhos', icon: Users },
   { to: '/config', label: 'Obrigações & Config.', icon: Settings },
 ]

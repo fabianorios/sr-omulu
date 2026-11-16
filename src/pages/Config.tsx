@@ -1,7 +1,12 @@
 import { useState, type FormEvent } from 'react'
-import { FlaskConical } from 'lucide-react'
+import { FlaskConical, Plus, Trash2 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
-import type { ObligationType, ObligationTypeId } from '../types'
+import type {
+  ObligationType,
+  ObligationTypeId,
+  ObrigacaoItem,
+} from '../types'
+import { emptyObrigacaoItem, formatObrigacaoItem } from '../types'
 import { calculateNextDate, formatBR } from '../utils/status'
 
 export function Config() {
@@ -30,11 +35,25 @@ export function Config() {
   function saveEdit(e: FormEvent) {
     e.preventDefault()
     if (!editing) return
+    const itensPadrao = (editing.itensPadrao ?? [])
+      .map((i) => ({
+        nome: i.nome.trim(),
+        quantidade: Number(i.quantidade) > 0 ? Number(i.quantidade) : 1,
+      }))
+      .filter((i) => i.nome)
     updateTipo(editing.id, {
       name: editing.name,
       description: editing.description,
+      itensPadrao,
     })
     setEditing(null)
+  }
+
+  function updateEditingItem(index: number, patch: Partial<ObrigacaoItem>) {
+    if (!editing) return
+    const itensPadrao = [...(editing.itensPadrao ?? [])]
+    itensPadrao[index] = { ...itensPadrao[index], ...patch }
+    setEditing({ ...editing, itensPadrao })
   }
 
   return (
@@ -87,6 +106,12 @@ export function Config() {
                     ? 'Pontual — sem intervalo automático.'
                     : `Auto-cálculo: +${tipo.yearsOffset} ano(s) a partir da última data${tipo.isFestiva ? ' — Festiva' : ''}.`}
                 </p>
+                {tipo.itensPadrao && tipo.itensPadrao.length > 0 ? (
+                  <p className="mt-1 text-xs text-[var(--color-ink-muted)]">
+                    Itens padrão:{' '}
+                    {tipo.itensPadrao.map(formatObrigacaoItem).join(', ')}
+                  </p>
+                ) : null}
               </div>
             </div>
 
@@ -204,6 +229,68 @@ export function Config() {
                 required
               />
             </label>
+            <div className="mt-4 space-y-2">
+              <span className="block text-xs font-semibold text-[var(--color-ink-muted)] uppercase">
+                Itens padrão (nome + quantidade)
+              </span>
+              {(editing.itensPadrao ?? []).map((item, index) => (
+                <div
+                  key={`padrao-${index}`}
+                  className="grid grid-cols-[1fr_5rem_auto] gap-2"
+                >
+                  <input
+                    value={item.nome}
+                    onChange={(e) =>
+                      updateEditingItem(index, { nome: e.target.value })
+                    }
+                    placeholder="Item"
+                    className="rounded-md border border-[var(--color-border)] bg-white px-3 py-2 text-sm"
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    value={item.quantidade}
+                    onChange={(e) =>
+                      updateEditingItem(index, {
+                        quantidade: Number(e.target.value) || 1,
+                      })
+                    }
+                    className="rounded-md border border-[var(--color-border)] bg-white px-3 py-2 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setEditing({
+                        ...editing,
+                        itensPadrao: (editing.itensPadrao ?? []).filter(
+                          (_, i) => i !== index,
+                        ),
+                      })
+                    }
+                    className="inline-flex h-[38px] w-[38px] items-center justify-center rounded-md border border-[var(--color-border)] text-[var(--color-ink-muted)]"
+                    aria-label="Remover item"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() =>
+                  setEditing({
+                    ...editing,
+                    itensPadrao: [
+                      ...(editing.itensPadrao ?? []),
+                      emptyObrigacaoItem(),
+                    ],
+                  })
+                }
+                className="inline-flex items-center gap-1 text-sm font-semibold text-[var(--color-forest)]"
+              >
+                <Plus size={14} />
+                Adicionar item
+              </button>
+            </div>
             <div className="mt-5 flex justify-end gap-2">
               <button
                 type="button"
