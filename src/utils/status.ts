@@ -21,6 +21,7 @@ export function parseDate(iso: string): Date {
 }
 
 export function formatBR(iso: string): string {
+  if (!iso?.trim()) return '—'
   return format(parseDate(iso), 'dd/MM/yyyy')
 }
 

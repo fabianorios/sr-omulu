@@ -1,27 +1,94 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
-import { UserPlus, X } from 'lucide-react'
+import { Loader2, Plus, Trash2, UserPlus, X } from 'lucide-react'
 import { ORIXAS } from '../../data/mock'
 import { useApp } from '../../context/AppContext'
-import type { Orixa } from '../../types'
+import { formatCep, lookupCep } from '../../lib/viacep'
+import type { Endereco, Orixa } from '../../types'
+import { emptyEndereco } from '../../types'
 
 export function NovoFilhoModal({ onClose }: { onClose: () => void }) {
   const { addFilho } = useApp()
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [cepStatus, setCepStatus] = useState('')
+  const [cepLoading, setCepLoading] = useState(false)
+
   const [nome, setNome] = useState('')
   const [orixa, setOrixa] = useState<Orixa>('Omulu')
+  const [paiDeCabeca, setPaiDeCabeca] = useState('')
+  const [maeDeCabeca, setMaeDeCabeca] = useState('')
+  const [guias, setGuias] = useState<string[]>([''])
+  const [dataNascimento, setDataNascimento] = useState('')
+  const [dataEntrada, setDataEntrada] = useState('')
   const [iniciacao, setIniciacao] = useState('')
-  const [telefone, setTelefone] = useState('')
+  const [telefone1, setTelefone1] = useState('')
+  const [telefone2, setTelefone2] = useState('')
   const [email, setEmail] = useState('')
+  const [endereco, setEndereco] = useState<Endereco>(emptyEndereco())
 
-  function handleSubmit(e: FormEvent) {
+  function updateGuia(index: number, value: string) {
+    setGuias((prev) => prev.map((g, i) => (i === index ? value : g)))
+  }
+
+  function addGuia() {
+    setGuias((prev) => [...prev, ''])
+  }
+
+  function removeGuia(index: number) {
+    setGuias((prev) => (prev.length <= 1 ? [''] : prev.filter((_, i) => i !== index)))
+  }
+
+  async function handleCepBlur() {
+    const digits = endereco.cep.replace(/\D/g, '')
+    if (digits.length !== 8) return
+    setCepLoading(true)
+    setCepStatus('')
+    const result = await lookupCep(digits)
+    setCepLoading(false)
+    if (result.ok === false) {
+      setCepStatus(result.error)
+      return
+    }
+    setEndereco((prev) => ({
+      ...prev,
+      ...result.partial,
+      numero: prev.numero,
+      complemento: prev.complemento,
+    }))
+    setCepStatus('Endereço preenchido pelo CEP.')
+  }
+
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!nome.trim() || !iniciacao || !telefone.trim()) return
-    addFilho({
+    setError('')
+    if (!nome.trim() || !telefone1.trim()) {
+      setError('Nome e telefone 1 são obrigatórios.')
+      return
+    }
+    setSaving(true)
+    const result = await addFilho({
       nome: nome.trim(),
       orixa,
+      paiDeCabeca: paiDeCabeca.trim() || orixa,
+      maeDeCabeca: maeDeCabeca.trim(),
+      guias: guias.map((g) => g.trim()).filter(Boolean),
+      dataNascimento,
+      dataEntrada,
       iniciacao,
-      telefone: telefone.trim(),
+      telefone1: telefone1.trim(),
+      telefone2: telefone2.trim(),
       email: email.trim() || undefined,
+      endereco: {
+        ...endereco,
+        cep: formatCep(endereco.cep),
+        uf: endereco.uf.toUpperCase().slice(0, 2),
+      },
     })
+    setSaving(false)
+    if (!result.ok) {
+      setError(result.error ?? 'Não foi possível salvar.')
+      return
+    }
     onClose()
   }
 
@@ -32,12 +99,12 @@ export function NovoFilhoModal({ onClose }: { onClose: () => void }) {
       role="presentation"
     >
       <div
-        className="animate-modal max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl border border-[var(--color-border)] bg-[var(--color-cream)] shadow-xl sm:rounded-lg"
+        className="animate-modal max-h-[94vh] w-full max-w-2xl overflow-y-auto rounded-t-2xl border border-[var(--color-border)] bg-[var(--color-cream)] shadow-xl sm:rounded-lg"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-labelledby="novo-filho-title"
       >
-        <div className="flex items-center justify-between border-b border-[var(--color-border-soft)] px-5 py-4">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--color-border-soft)] bg-[var(--color-cream)] px-5 py-4">
           <div className="flex items-center gap-2">
             <UserPlus size={18} className="text-[var(--color-forest)]" />
             <h2
@@ -57,62 +124,252 @@ export function NovoFilhoModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 px-5 py-5">
-          <Field label="Nome completo">
-            <input
-              required
-              value={nome}
-              onChange={(e) => setNome(e.target.value)}
-              placeholder="Nome do médium"
-              className="field-input"
-            />
-          </Field>
-
-          <Field label="Orixá de cabeça">
-            <select
-              value={orixa}
-              onChange={(e) => setOrixa(e.target.value as Orixa)}
-              className="field-input"
-            >
+        <form onSubmit={handleSubmit} className="space-y-5 px-5 py-5">
+          <Section title="Identificação">
+            <Field label="Nome completo">
+              <input
+                required
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                placeholder="Nome do médium"
+                className="field-input"
+              />
+            </Field>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Field label="Orixá de cabeça">
+                <select
+                  value={orixa}
+                  onChange={(e) => setOrixa(e.target.value as Orixa)}
+                  className="field-input"
+                >
+                  {ORIXAS.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Pai de cabeça">
+                <input
+                  value={paiDeCabeca}
+                  onChange={(e) => setPaiDeCabeca(e.target.value)}
+                  placeholder="Ex.: Omulu"
+                  list="orixas-list"
+                  className="field-input"
+                />
+              </Field>
+              <Field label="Mãe de cabeça">
+                <input
+                  value={maeDeCabeca}
+                  onChange={(e) => setMaeDeCabeca(e.target.value)}
+                  placeholder="Ex.: Nanã"
+                  list="orixas-list"
+                  className="field-input"
+                />
+              </Field>
+            </div>
+            <datalist id="orixas-list">
               {ORIXAS.map((o) => (
-                <option key={o} value={o}>
-                  {o}
-                </option>
+                <option key={o} value={o} />
               ))}
-            </select>
-          </Field>
+            </datalist>
+          </Section>
 
-          <Field label="Data iniciação / fechamento">
-            <input
-              required
-              type="date"
-              value={iniciacao}
-              onChange={(e) => setIniciacao(e.target.value)}
-              className="field-input"
-            />
-          </Field>
+          <Section title="Guias que atuam com o médium">
+            <div className="space-y-2">
+              {guias.map((guia, index) => (
+                <div key={index} className="flex gap-2">
+                  <input
+                    value={guia}
+                    onChange={(e) => updateGuia(index, e.target.value)}
+                    placeholder={`Nome da guia ${index + 1}`}
+                    className="field-input"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeGuia(index)}
+                    className="rounded-md border border-[var(--color-border)] px-2 text-[var(--color-ink-muted)] hover:bg-[var(--color-parchment)]"
+                    aria-label="Remover guia"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={addGuia}
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--color-forest)] hover:underline"
+              >
+                <Plus size={14} />
+                Adicionar guia
+              </button>
+            </div>
+          </Section>
 
-          <Field label="Telefone / WhatsApp">
-            <input
-              required
-              value={telefone}
-              onChange={(e) => setTelefone(e.target.value)}
-              placeholder="(11) 90000-0000"
-              className="field-input"
-            />
-          </Field>
+          <Section title="Datas">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Field label="Data de nascimento">
+                <input
+                  type="date"
+                  value={dataNascimento}
+                  onChange={(e) => setDataNascimento(e.target.value)}
+                  className="field-input"
+                />
+              </Field>
+              <Field label="Entrada no terreiro">
+                <input
+                  type="date"
+                  value={dataEntrada}
+                  onChange={(e) => setDataEntrada(e.target.value)}
+                  className="field-input"
+                />
+              </Field>
+              <Field label="Iniciação / fechamento">
+                <input
+                  type="date"
+                  value={iniciacao}
+                  onChange={(e) => setIniciacao(e.target.value)}
+                  className="field-input"
+                />
+              </Field>
+            </div>
+          </Section>
 
-          <Field label="E-mail (opcional)">
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="email@exemplo.com"
-              className="field-input"
-            />
-          </Field>
+          <Section title="Contato">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Telefone 1 / WhatsApp">
+                <input
+                  required
+                  value={telefone1}
+                  onChange={(e) => setTelefone1(e.target.value)}
+                  placeholder="(11) 90000-0000"
+                  className="field-input"
+                />
+              </Field>
+              <Field label="Telefone 2 (opcional)">
+                <input
+                  value={telefone2}
+                  onChange={(e) => setTelefone2(e.target.value)}
+                  placeholder="(11) 90000-0000"
+                  className="field-input"
+                />
+              </Field>
+            </div>
+            <Field label="E-mail (opcional)">
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="email@exemplo.com"
+                className="field-input"
+              />
+            </Field>
+          </Section>
 
-          <div className="flex items-center justify-end gap-3 pt-2">
+          <Section title="Endereço residencial">
+            <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+              <Field label="CEP">
+                <input
+                  value={endereco.cep}
+                  onChange={(e) =>
+                    setEndereco((prev) => ({
+                      ...prev,
+                      cep: formatCep(e.target.value),
+                    }))
+                  }
+                  onBlur={handleCepBlur}
+                  placeholder="00000-000"
+                  inputMode="numeric"
+                  className="field-input"
+                />
+              </Field>
+              <div className="flex items-end pb-0.5">
+                <button
+                  type="button"
+                  onClick={handleCepBlur}
+                  disabled={cepLoading}
+                  className="inline-flex h-[38px] items-center gap-1.5 rounded-md border border-[var(--color-forest)] px-3 text-sm font-semibold text-[var(--color-forest)] hover:bg-[var(--color-parchment)] disabled:opacity-60"
+                >
+                  {cepLoading ? <Loader2 size={14} className="animate-spin" /> : null}
+                  Buscar CEP
+                </button>
+              </div>
+            </div>
+            {cepStatus ? (
+              <p className="text-xs text-[var(--color-ink-muted)]">{cepStatus}</p>
+            ) : null}
+            <Field label="Logradouro">
+              <input
+                value={endereco.logradouro}
+                onChange={(e) =>
+                  setEndereco((prev) => ({ ...prev, logradouro: e.target.value }))
+                }
+                className="field-input"
+              />
+            </Field>
+            <div className="grid gap-3 sm:grid-cols-[1fr_1.4fr]">
+              <Field label="Número">
+                <input
+                  value={endereco.numero}
+                  onChange={(e) =>
+                    setEndereco((prev) => ({ ...prev, numero: e.target.value }))
+                  }
+                  className="field-input"
+                />
+              </Field>
+              <Field label="Complemento">
+                <input
+                  value={endereco.complemento}
+                  onChange={(e) =>
+                    setEndereco((prev) => ({
+                      ...prev,
+                      complemento: e.target.value,
+                    }))
+                  }
+                  className="field-input"
+                />
+              </Field>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-[1.4fr_1.4fr_0.6fr]">
+              <Field label="Bairro">
+                <input
+                  value={endereco.bairro}
+                  onChange={(e) =>
+                    setEndereco((prev) => ({ ...prev, bairro: e.target.value }))
+                  }
+                  className="field-input"
+                />
+              </Field>
+              <Field label="Cidade">
+                <input
+                  value={endereco.cidade}
+                  onChange={(e) =>
+                    setEndereco((prev) => ({ ...prev, cidade: e.target.value }))
+                  }
+                  className="field-input"
+                />
+              </Field>
+              <Field label="UF">
+                <input
+                  value={endereco.uf}
+                  onChange={(e) =>
+                    setEndereco((prev) => ({
+                      ...prev,
+                      uf: e.target.value.toUpperCase().slice(0, 2),
+                    }))
+                  }
+                  maxLength={2}
+                  className="field-input"
+                />
+              </Field>
+            </div>
+          </Section>
+
+          {error ? (
+            <p className="text-sm text-[var(--color-status-vencida-fg)]">{error}</p>
+          ) : null}
+
+          <div className="flex items-center justify-end gap-3 border-t border-[var(--color-border-soft)] pt-4">
             <button
               type="button"
               onClick={onClose}
@@ -122,8 +379,10 @@ export function NovoFilhoModal({ onClose }: { onClose: () => void }) {
             </button>
             <button
               type="submit"
-              className="rounded-md bg-[var(--color-forest)] px-4 py-2 text-sm font-semibold text-[var(--color-cream)] hover:bg-[var(--color-forest-hover)]"
+              disabled={saving}
+              className="inline-flex items-center gap-2 rounded-md bg-[var(--color-forest)] px-4 py-2 text-sm font-semibold text-[var(--color-cream)] hover:bg-[var(--color-forest-hover)] disabled:opacity-60"
             >
+              {saving ? <Loader2 size={14} className="animate-spin" /> : null}
               Salvar filho
             </button>
           </div>
@@ -147,6 +406,17 @@ export function NovoFilhoModal({ onClose }: { onClose: () => void }) {
         }
       `}</style>
     </div>
+  )
+}
+
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="space-y-3">
+      <h3 className="text-xs font-semibold tracking-[0.14em] text-[var(--color-tan)] uppercase">
+        {title}
+      </h3>
+      {children}
+    </section>
   )
 }
 

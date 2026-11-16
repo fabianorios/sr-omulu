@@ -1,0 +1,136 @@
+import type { Filho, FilhoInput, Orixa } from '../types'
+import { emptyEndereco } from '../types'
+
+/** Shape returned by /api/filhos (snake_case from Supabase). */
+export type FilhoRow = {
+  id: string
+  nome: string
+  orixa: string
+  pai_de_cabeca: string | null
+  mae_de_cabeca: string | null
+  guias: string[] | null
+  data_nascimento: string | null
+  data_entrada: string | null
+  iniciacao: string | null
+  telefone1: string | null
+  telefone2: string | null
+  email: string | null
+  endereco_cep: string | null
+  endereco_logradouro: string | null
+  endereco_numero: string | null
+  endereco_complemento: string | null
+  endereco_bairro: string | null
+  endereco_cidade: string | null
+  endereco_uf: string | null
+}
+
+const LOCAL_KEY = 'sr-omulu.filhos.v1'
+
+export function rowToFilho(row: FilhoRow): Filho {
+  return {
+    id: row.id,
+    nome: row.nome,
+    orixa: row.orixa as Orixa,
+    paiDeCabeca: row.pai_de_cabeca ?? '',
+    maeDeCabeca: row.mae_de_cabeca ?? '',
+    guias: row.guias ?? [],
+    dataNascimento: row.data_nascimento ?? '',
+    dataEntrada: row.data_entrada ?? '',
+    iniciacao: row.iniciacao ?? '',
+    telefone1: row.telefone1 ?? '',
+    telefone2: row.telefone2 ?? '',
+    email: row.email ?? undefined,
+    endereco: {
+      cep: row.endereco_cep ?? '',
+      logradouro: row.endereco_logradouro ?? '',
+      numero: row.endereco_numero ?? '',
+      complemento: row.endereco_complemento ?? '',
+      bairro: row.endereco_bairro ?? '',
+      cidade: row.endereco_cidade ?? '',
+      uf: row.endereco_uf ?? '',
+    },
+  }
+}
+
+export function filhoToPayload(filho: FilhoInput) {
+  return {
+    nome: filho.nome,
+    orixa: filho.orixa,
+    paiDeCabeca: filho.paiDeCabeca,
+    maeDeCabeca: filho.maeDeCabeca,
+    guias: filho.guias,
+    dataNascimento: filho.dataNascimento,
+    dataEntrada: filho.dataEntrada,
+    iniciacao: filho.iniciacao,
+    telefone1: filho.telefone1,
+    telefone2: filho.telefone2,
+    email: filho.email,
+    endereco: filho.endereco ?? emptyEndereco(),
+  }
+}
+
+export type LoadFilhosResult =
+  | { source: 'supabase'; filhos: Filho[] }
+  | { source: 'unset'; filhos: Filho[] }
+  | { source: 'error'; filhos: Filho[]; error: string }
+
+export async function loadFilhosFromApi(): Promise<LoadFilhosResult> {
+  try {
+    const res = await fetch('/api/filhos', { credentials: 'same-origin' })
+    if (res.status === 401) {
+      return { source: 'error', filhos: [], error: 'unauthorized' }
+    }
+    if (!res.ok) {
+      return { source: 'error', filhos: [], error: `http_${res.status}` }
+    }
+    const data = (await res.json()) as {
+      source?: string
+      filhos?: FilhoRow[]
+      message?: string
+    }
+    if (data.source === 'unset' || data.message === 'supabase_unset') {
+      return { source: 'unset', filhos: [] }
+    }
+    return {
+      source: 'supabase',
+      filhos: (data.filhos ?? []).map(rowToFilho),
+    }
+  } catch {
+    return { source: 'error', filhos: [], error: 'network' }
+  }
+}
+
+export async function createFilhoViaApi(
+  filho: FilhoInput,
+): Promise<{ ok: true; filho: Filho } | { ok: false; error: string }> {
+  try {
+    const res = await fetch('/api/filhos', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(filhoToPayload(filho)),
+    })
+    const data = (await res.json()) as { filho?: FilhoRow; error?: string }
+    if (!res.ok || !data.filho) {
+      return { ok: false, error: data.error ?? `http_${res.status}` }
+    }
+    return { ok: true, filho: rowToFilho(data.filho) }
+  } catch {
+    return { ok: false, error: 'network' }
+  }
+}
+
+export function loadLocalFilhos(): Filho[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as Filho[]
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+export function saveLocalFilhos(filhos: Filho[]) {
+  localStorage.setItem(LOCAL_KEY, JSON.stringify(filhos))
+}

@@ -29,14 +29,34 @@ export interface ObligationType {
   active: boolean
 }
 
+export interface Endereco {
+  cep: string
+  logradouro: string
+  numero: string
+  complemento: string
+  bairro: string
+  cidade: string
+  uf: string
+}
+
 export interface Filho {
   id: string
   nome: string
+  /** Orixá de cabeça (campo legado / principal da corrente). */
   orixa: Orixa
+  paiDeCabeca: string
+  maeDeCabeca: string
+  guias: string[]
+  dataNascimento: string
+  dataEntrada: string
   iniciacao: string
-  telefone: string
+  telefone1: string
+  telefone2: string
   email?: string
+  endereco: Endereco
 }
+
+export type FilhoInput = Omit<Filho, 'id'> & { id?: string }
 
 export interface Obrigacao {
   id: string
@@ -53,9 +73,24 @@ export interface HouseEvent {
   tipo: 'gira' | 'festa' | 'evento'
 }
 
+export type DataSource = 'sample' | 'local' | 'supabase' | 'unset'
+
 export interface AppState {
   filhos: Filho[]
   obrigacoes: Obrigacao[]
   eventos: HouseEvent[]
   tipos: ObligationType[]
+  dataSource: DataSource
+}
+
+export function emptyEndereco(): Endereco {
+  return {
+    cep: '',
+    logradouro: '',
+    numero: '',
+    complemento: '',
+    bairro: '',
+    cidade: '',
+    uf: '',
+  }
 }

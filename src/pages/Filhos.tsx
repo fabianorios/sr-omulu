@@ -9,7 +9,7 @@ import {
 } from '../utils/status'
 
 export function Filhos() {
-  const { state } = useApp()
+  const { state, loadingFilhos } = useApp()
   const [query, setQuery] = useState('')
   const [detailId, setDetailId] = useState<string | null>(null)
 
@@ -23,10 +23,16 @@ export function Filhos() {
     return state.filhos
       .filter((f) => {
         if (!q) return true
-        return (
-          f.nome.toLowerCase().includes(q) ||
-          f.orixa.toLowerCase().includes(q)
-        )
+        const hay = [
+          f.nome,
+          f.orixa,
+          f.paiDeCabeca,
+          f.maeDeCabeca,
+          ...f.guias,
+        ]
+          .join(' ')
+          .toLowerCase()
+        return hay.includes(q)
       })
       .map((filho) => {
         const obr = nextObligationForFilho(filho.id, state.obrigacoes)
@@ -53,8 +59,8 @@ export function Filhos() {
           Lista de Filhos
         </h2>
         <p className="mt-2 text-sm text-[var(--color-ink-muted)]">
-          Busque por nome ou Orixá de cabeça. Consulte o histórico detalhado de
-          cada filho.
+          Busque por nome, Orixá ou guia. Consulte o histórico detalhado de cada
+          filho.
         </p>
       </div>
 
@@ -66,10 +72,14 @@ export function Filhos() {
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar por nome ou Orixá..."
+          placeholder="Buscar por nome, Orixá ou guia..."
           className="w-full rounded-md border border-[var(--color-border)] bg-white/80 py-2.5 pr-4 pl-10 text-sm outline-none focus:border-[var(--color-forest)] focus:ring-2 focus:ring-[var(--color-forest)]/15"
         />
       </div>
+
+      {loadingFilhos ? (
+        <p className="text-sm text-[var(--color-ink-muted)]">Carregando filhos…</p>
+      ) : null}
 
       <div className="animate-fade-in-delay-2 space-y-3 md:hidden">
         {rows.map(({ filho, obr, status }) => (
@@ -84,6 +94,8 @@ export function Filhos() {
                 </p>
                 <p className="mt-0.5 text-sm text-[var(--color-ink-muted)]">
                   {filho.orixa}
+                  {filho.paiDeCabeca ? ` · Pai ${filho.paiDeCabeca}` : ''}
+                  {filho.maeDeCabeca ? ` · Mãe ${filho.maeDeCabeca}` : ''}
                 </p>
               </div>
               {status && obr ? (
@@ -102,7 +114,7 @@ export function Filhos() {
               </div>
               <div className="flex justify-between gap-3">
                 <dt className="text-[var(--color-ink-faint)]">WhatsApp</dt>
-                <dd>{filho.telefone}</dd>
+                <dd>{filho.telefone1}</dd>
               </div>
             </dl>
             <button
@@ -118,14 +130,14 @@ export function Filhos() {
       </div>
 
       <div className="animate-fade-in-delay-2 hidden overflow-x-auto rounded-lg border border-[var(--color-border)] bg-[var(--color-cream)]/80 shadow-sm md:block">
-        <table className="w-full min-w-[900px] border-collapse text-left text-sm">
+        <table className="w-full min-w-[980px] border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-[var(--color-border-soft)] text-[11px] tracking-wide text-[var(--color-ink-faint)] uppercase">
               <th className="px-4 py-3 font-semibold">Nome</th>
-              <th className="px-4 py-3 font-semibold">Orixá de cabeça</th>
-              <th className="px-4 py-3 font-semibold">Iniciação / Fechamento</th>
-              <th className="px-4 py-3 font-semibold">Telefone / WhatsApp</th>
-              <th className="px-4 py-3 font-semibold">Status Obrigação</th>
+              <th className="px-4 py-3 font-semibold">Orixá / Pai / Mãe</th>
+              <th className="px-4 py-3 font-semibold">Iniciação</th>
+              <th className="px-4 py-3 font-semibold">Telefones</th>
+              <th className="px-4 py-3 font-semibold">Status</th>
               <th className="px-4 py-3 font-semibold">Histórico</th>
             </tr>
           </thead>
@@ -136,13 +148,21 @@ export function Filhos() {
                   {filho.nome}
                 </td>
                 <td className="px-4 py-3.5 text-[var(--color-ink-muted)]">
-                  {filho.orixa}
+                  <div>{filho.orixa}</div>
+                  <div className="text-xs text-[var(--color-ink-faint)]">
+                    Pai {filho.paiDeCabeca || '—'} · Mãe {filho.maeDeCabeca || '—'}
+                  </div>
                 </td>
                 <td className="px-4 py-3.5 text-[var(--color-ink-muted)]">
                   {formatBR(filho.iniciacao)}
                 </td>
                 <td className="px-4 py-3.5 text-[var(--color-ink-muted)]">
-                  {filho.telefone}
+                  <div>{filho.telefone1 || '—'}</div>
+                  {filho.telefone2 ? (
+                    <div className="text-xs text-[var(--color-ink-faint)]">
+                      {filho.telefone2}
+                    </div>
+                  ) : null}
                 </td>
                 <td className="px-4 py-3.5">
                   {status && obr ? (
@@ -153,9 +173,7 @@ export function Filhos() {
                       </span>
                     </div>
                   ) : (
-                    <span className="text-xs text-[var(--color-ink-faint)]">
-                      —
-                    </span>
+                    <span className="text-xs text-[var(--color-ink-faint)]">—</span>
                   )}
                 </td>
                 <td className="px-4 py-3.5">
@@ -176,25 +194,49 @@ export function Filhos() {
 
       {detailFilho && (
         <div
-          className="animate-backdrop fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-ink)]/40 p-4"
+          className="animate-backdrop fixed inset-0 z-50 flex items-end justify-center bg-[var(--color-ink)]/40 p-0 sm:items-center sm:p-4"
           onClick={() => setDetailId(null)}
           role="presentation"
         >
           <div
-            className="animate-modal w-full max-w-lg rounded-lg border border-[var(--color-border)] bg-[var(--color-cream)] p-5 shadow-xl"
+            className="animate-modal max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-[var(--color-border)] bg-[var(--color-cream)] p-5 shadow-xl sm:rounded-lg"
             onClick={(e) => e.stopPropagation()}
             role="dialog"
           >
             <h3 className="font-serif text-2xl font-semibold text-[var(--color-forest)]">
               {detailFilho.nome}
             </h3>
-            <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-              {detailFilho.orixa} · Iniciação {formatBR(detailFilho.iniciacao)}
-              {detailFilho.email ? ` · ${detailFilho.email}` : ''}
-            </p>
-            <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-              {detailFilho.telefone}
-            </p>
+            <dl className="mt-3 space-y-1.5 text-sm text-[var(--color-ink-muted)]">
+              <div>Orixá de cabeça: {detailFilho.orixa}</div>
+              <div>Pai de cabeça: {detailFilho.paiDeCabeca || '—'}</div>
+              <div>Mãe de cabeça: {detailFilho.maeDeCabeca || '—'}</div>
+              <div>
+                Guias:{' '}
+                {detailFilho.guias.length
+                  ? detailFilho.guias.join(', ')
+                  : '—'}
+              </div>
+              <div>Nascimento: {formatBR(detailFilho.dataNascimento)}</div>
+              <div>Entrada: {formatBR(detailFilho.dataEntrada)}</div>
+              <div>Iniciação: {formatBR(detailFilho.iniciacao)}</div>
+              <div>Tel. 1: {detailFilho.telefone1 || '—'}</div>
+              <div>Tel. 2: {detailFilho.telefone2 || '—'}</div>
+              {detailFilho.email ? <div>E-mail: {detailFilho.email}</div> : null}
+              <div>
+                Endereço:{' '}
+                {[
+                  detailFilho.endereco.logradouro,
+                  detailFilho.endereco.numero,
+                  detailFilho.endereco.complemento,
+                  detailFilho.endereco.bairro,
+                  detailFilho.endereco.cidade,
+                  detailFilho.endereco.uf,
+                  detailFilho.endereco.cep,
+                ]
+                  .filter(Boolean)
+                  .join(', ') || '—'}
+              </div>
+            </dl>
 
             <h4 className="mt-5 text-xs font-semibold tracking-wide text-[var(--color-ink-faint)] uppercase">
               Histórico de obrigações
