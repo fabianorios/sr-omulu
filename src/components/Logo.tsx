@@ -38,6 +38,7 @@ export function Logo({
             }
       }
       decoding="async"
+      fetchPriority={size >= 80 ? 'high' : 'auto'}
     />
   )
 }

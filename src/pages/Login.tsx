@@ -37,13 +37,8 @@ export function Login() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center text-sm text-[var(--color-ink-muted)]">
-        Carregando…
-      </div>
-    )
-  }
+  // Paint the form immediately — do not wait on /api/auth/me.
+  // Bootstrap fields appear when me returns needsBootstrap.
 
   return (
     <div className="flex min-h-screen items-center justify-center px-4 py-10">
@@ -127,10 +122,14 @@ export function Login() {
 
           <button
             type="submit"
-            disabled={saving}
+            disabled={saving || loading}
             className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-[var(--color-forest)] px-4 py-2.5 text-sm font-semibold text-[var(--color-cream)] disabled:opacity-60"
           >
-            {saving ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />}
+            {saving || loading ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Lock size={16} />
+            )}
             {needsBootstrap ? 'Criar administrador' : 'Entrar'}
           </button>
         </form>

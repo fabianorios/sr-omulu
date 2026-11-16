@@ -1,43 +1,47 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { lazy, Suspense } from 'react'
+import { BrowserRouter } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
-import { AppProvider } from './context/AppContext'
-import { Layout } from './components/Layout'
-import { Dashboard } from './pages/Dashboard'
-import { Agenda } from './pages/Agenda'
-import { Financeiro } from './pages/Financeiro'
-import { Filhos } from './pages/Filhos'
-import { Config } from './pages/Config'
-import { Usuarios } from './pages/Usuarios'
 import { Login } from './pages/Login'
 
-function ProtectedApp() {
-  const { user, loading, isAdmin } = useAuth()
+const AuthenticatedApp = lazy(() => import('./AuthenticatedApp'))
 
-  if (loading) {
+function BootFallback() {
+  return (
+    <div className="flex min-h-screen items-center justify-center text-sm text-[var(--color-ink-muted)]">
+      Carregando…
+    </div>
+  )
+}
+
+/** Cookie hint only — avoids a login flash for returning sessions. */
+function hasSessionCookieHint(): boolean {
+  try {
+    return document.cookie.split(';').some((part) => {
+      const name = part.trim().split('=')[0]
+      return name === 'sr_omulu_sess'
+    })
+  } catch {
+    return false
+  }
+}
+
+function ProtectedApp() {
+  const { user, loading } = useAuth()
+
+  if (user) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-sm text-[var(--color-ink-muted)]">
-        Carregando…
-      </div>
+      <Suspense fallback={<BootFallback />}>
+        <AuthenticatedApp />
+      </Suspense>
     )
   }
 
-  if (!user) return <Login />
+  // Returning visitor with a session cookie: wait for /me instead of flashing Login.
+  if (loading && hasSessionCookieHint()) {
+    return <BootFallback />
+  }
 
-  return (
-    <AppProvider>
-      <Routes>
-        <Route element={<Layout />}>
-          <Route index element={<Dashboard />} />
-          <Route path="agenda" element={<Agenda />} />
-          <Route path="financeiro" element={<Financeiro />} />
-          <Route path="filhos" element={<Filhos />} />
-          {isAdmin ? <Route path="config" element={<Config />} /> : null}
-          {isAdmin ? <Route path="usuarios" element={<Usuarios />} /> : null}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Route>
-      </Routes>
-    </AppProvider>
-  )
+  return <Login />
 }
 
 export default function App() {

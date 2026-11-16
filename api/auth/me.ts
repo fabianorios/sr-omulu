@@ -9,20 +9,26 @@ import {
 export async function GET(request: Request): Promise<Response> {
   try {
     const session = await getAppSession(request)
-    const adminRows = await countAdminRows()
-    const needsBootstrap =
-      adminRows === 0 && bootstrapAvailable() && !session
 
-    if (!session) {
+    // Returning users: skip the admin-count query (was always running before).
+    if (session) {
       return json({
-        authenticated: false,
-        needsBootstrap,
+        authenticated: true,
+        needsBootstrap: false,
+        user: publicUser(session.user),
       })
     }
+
+    // Anonymous: only hit DB for bootstrap flag when the secret is configured.
+    let needsBootstrap = false
+    if (bootstrapAvailable()) {
+      const adminRows = await countAdminRows()
+      needsBootstrap = adminRows === 0
+    }
+
     return json({
-      authenticated: true,
-      needsBootstrap: false,
-      user: publicUser(session.user),
+      authenticated: false,
+      needsBootstrap,
     })
   } catch (error) {
     return json(
