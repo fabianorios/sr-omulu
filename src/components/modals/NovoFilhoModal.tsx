@@ -1,17 +1,18 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
-import { Loader2, UserPlus, X } from 'lucide-react'
+import { Loader2, Plus, Trash2, UserPlus, X } from 'lucide-react'
 import {
-  GUIAS,
   MAES_DE_CABECA,
   PAIS_DE_CABECA,
-  type Guia,
+  TIPOS_ENTIDADE,
   type MaeDeCabeca,
   type PaiDeCabeca,
+  type TipoEntidade,
 } from '../../data/catalog'
 import { useApp } from '../../context/AppContext'
+import { ensureEntidadeRows, sanitizeEntidadesForSave } from '../../lib/entidades'
 import { formatCep, lookupCep } from '../../lib/viacep'
-import type { Endereco, Filho } from '../../types'
-import { emptyEndereco } from '../../types'
+import type { Endereco, EntidadeLinha, Filho } from '../../types'
+import { emptyEndereco, emptyEntidadeLinha } from '../../types'
 
 type Props = {
   onClose: () => void
@@ -33,7 +34,9 @@ export function NovoFilhoModal({ onClose, initial = null }: Props) {
   const [maeDeCabeca, setMaeDeCabeca] = useState<MaeDeCabeca>(
     initial?.maeDeCabeca ?? 'Oxum',
   )
-  const [guias, setGuias] = useState<Guia[]>(initial?.guias ?? [])
+  const [entidades, setEntidades] = useState<EntidadeLinha[]>(() =>
+    ensureEntidadeRows(initial?.entidades ?? []),
+  )
   const [dataNascimento, setDataNascimento] = useState(
     initial?.dataNascimento ?? '',
   )
@@ -46,10 +49,23 @@ export function NovoFilhoModal({ onClose, initial = null }: Props) {
     initial?.endereco ?? emptyEndereco(),
   )
 
-  function toggleGuia(guia: Guia) {
-    setGuias((prev) => {
-      if (prev.includes(guia)) return prev.filter((g) => g !== guia)
-      return [...prev, guia].sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  function updateEntidade(
+    index: number,
+    patch: Partial<EntidadeLinha>,
+  ) {
+    setEntidades((prev) =>
+      prev.map((row, i) => (i === index ? { ...row, ...patch } : row)),
+    )
+  }
+
+  function addEntidadeRow() {
+    setEntidades((prev) => [...prev, emptyEntidadeLinha()])
+  }
+
+  function removeEntidadeRow(index: number) {
+    setEntidades((prev) => {
+      const next = prev.filter((_, i) => i !== index)
+      return next.length > 0 ? next : [emptyEntidadeLinha()]
     })
   }
 
@@ -87,7 +103,7 @@ export function NovoFilhoModal({ onClose, initial = null }: Props) {
       nome: nome.trim(),
       paiDeCabeca,
       maeDeCabeca,
-      guias: [...guias].sort((a, b) => a.localeCompare(b, 'pt-BR')),
+      entidades: sanitizeEntidadesForSave(entidades),
       dataNascimento,
       dataEntrada,
       iniciacao,
@@ -192,30 +208,65 @@ export function NovoFilhoModal({ onClose, initial = null }: Props) {
             </div>
           </Section>
 
-          <Section title="Guias que atuam com o médium">
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {GUIAS.map((guia) => {
-                const checked = guias.includes(guia)
-                return (
-                  <label
-                    key={guia}
+          <Section title="Entidades que atuam com o médium">
+            <div className="space-y-3">
+              {entidades.map((row, index) => (
+                <div
+                  key={`entidade-${index}`}
+                  className="grid gap-2 sm:grid-cols-[1.1fr_1.4fr_auto]"
+                >
+                  <Field label={index === 0 ? 'Entidade' : undefined}>
+                    <select
+                      value={row.tipo}
+                      onChange={(e) =>
+                        updateEntidade(index, {
+                          tipo: e.target.value as TipoEntidade,
+                        })
+                      }
+                      className="field-input"
+                    >
+                      {TIPOS_ENTIDADE.map((tipo) => (
+                        <option key={tipo} value={tipo}>
+                          {tipo}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label={index === 0 ? 'Nome' : undefined}>
+                    <input
+                      value={row.nome}
+                      onChange={(e) =>
+                        updateEntidade(index, { nome: e.target.value })
+                      }
+                      placeholder="Nome da entidade"
+                      className="field-input"
+                    />
+                  </Field>
+                  <div
                     className={[
-                      'flex cursor-pointer items-center gap-2 rounded-md border px-2.5 py-2 text-sm',
-                      checked
-                        ? 'border-[var(--color-forest)] bg-[var(--color-parchment)] text-[var(--color-forest)]'
-                        : 'border-[var(--color-border)] bg-white/80 text-[var(--color-ink-muted)]',
+                      'flex items-end',
+                      index === 0 ? 'pb-0.5' : '',
                     ].join(' ')}
                   >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggleGuia(guia)}
-                      className="accent-[var(--color-forest)]"
-                    />
-                    <span>{guia}</span>
-                  </label>
-                )
-              })}
+                    <button
+                      type="button"
+                      onClick={() => removeEntidadeRow(index)}
+                      className="inline-flex h-[38px] w-[38px] items-center justify-center rounded-md border border-[var(--color-border)] text-[var(--color-ink-muted)] hover:bg-[var(--color-parchment)] hover:text-[var(--color-forest)]"
+                      aria-label={`Remover entidade ${index + 1}`}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={addEntidadeRow}
+                className="inline-flex items-center gap-1.5 rounded-md border border-[var(--color-forest)] px-3 py-2 text-sm font-semibold text-[var(--color-forest)] hover:bg-[var(--color-parchment)]"
+              >
+                <Plus size={14} />
+                Adicionar entidade
+              </button>
             </div>
           </Section>
 
@@ -444,14 +495,16 @@ function Field({
   label,
   children,
 }: {
-  label: string
+  label?: string
   children: ReactNode
 }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-xs font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase">
-        {label}
-      </span>
+      {label ? (
+        <span className="mb-1.5 block text-xs font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase">
+          {label}
+        </span>
+      ) : null}
       {children}
     </label>
   )

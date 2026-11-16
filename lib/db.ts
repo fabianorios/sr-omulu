@@ -60,6 +60,7 @@ export type FilhoRow = {
   pai_de_cabeca: string | null
   mae_de_cabeca: string | null
   guias: string[] | null
+  entidades?: unknown
   data_nascimento: string | null
   data_entrada: string | null
   iniciacao: string | null
