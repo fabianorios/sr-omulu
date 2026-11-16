@@ -1,20 +1,73 @@
 import { readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { PGlite } from '@electric-sql/pglite'
 import pg from 'pg'
 
 const databaseUrl = process.env.DATABASE_URL?.trim() ?? ''
+
 let pool: pg.Pool | undefined
 let local: Promise<PGlite> | undefined
+let supabaseAdmin: SupabaseClient | null | undefined
 
-export function dbMode(): 'postgres' | 'pglite' {
+export function supabaseConfigured(): boolean {
+  return Boolean(
+    process.env.SUPABASE_URL?.trim() &&
+      process.env.SUPABASE_SERVICE_ROLE_KEY?.trim(),
+  )
+}
+
+export function getSupabaseAdmin(): SupabaseClient | null {
+  if (!supabaseConfigured()) return null
+  if (supabaseAdmin !== undefined) return supabaseAdmin
+  const url = process.env.SUPABASE_URL!.trim()
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!.trim()
+  supabaseAdmin = createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+  return supabaseAdmin
+}
+
+/**
+ * Prefer Supabase when URL + service role are set (migration target).
+ * Else Cursor/platform Postgres via DATABASE_URL, else in-memory PGlite.
+ */
+export function dbMode(): 'supabase' | 'postgres' | 'pglite' {
+  if (supabaseConfigured()) return 'supabase'
   return databaseUrl !== '' ? 'postgres' : 'pglite'
+}
+
+function toJsonParam(value: unknown): unknown {
+  if (value === undefined) return null
+  if (value instanceof Date) return value.toISOString()
+  return value
+}
+
+async function sqlViaSupabase<T>(
+  text: string,
+  params: unknown[],
+): Promise<T[]> {
+  const client = getSupabaseAdmin()
+  if (!client) throw new Error('supabase_unavailable')
+  const { data, error } = await client.rpc('app_sql', {
+    query: text,
+    params: params.map(toJsonParam),
+  })
+  if (error) {
+    throw new Error(error.message || 'supabase_rpc_error')
+  }
+  if (data == null) return []
+  if (Array.isArray(data)) return data as T[]
+  return []
 }
 
 export async function sql<T = Record<string, unknown>>(
   text: string,
   params: unknown[] = [],
 ): Promise<T[]> {
+  if (supabaseConfigured()) {
+    return sqlViaSupabase<T>(text, params)
+  }
   if (databaseUrl !== '') {
     pool ??= new pg.Pool({ connectionString: databaseUrl, max: 5 })
     return (await pool.query(text, params)).rows as T[]

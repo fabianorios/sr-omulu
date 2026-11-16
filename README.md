@@ -7,27 +7,36 @@ Agenda e controle inteligente de obrigações dos médiuns da casa.
 - Vite + React 19 + TypeScript
 - Tailwind CSS v4
 - Lucide + date-fns + React Router
-- **Cursor Postgres** (`cursor-app.json` → platform `DATABASE_URL`)
+- **Supabase** (preferred when `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` are set)
+- Cursor Postgres fallback (`cursor-app.json` → `DATABASE_URL`) or local **PGlite**
 - ViaCEP (busca de endereço)
-- Schema espelhado em `supabase/schema.sql` para migração futura
 
 ## Scripts
 
 ```bash
 npm install
-npm run dev      # http://127.0.0.1:5173 (PGlite in-memory; no DATABASE_URL)
+npm run dev      # http://127.0.0.1:5173 (PGlite unless Supabase env is set)
 npm run build   # vite build + migrate when DATABASE_URL is set
 npm run preview
 ```
 
 ## Database
 
-- Declare: `cursor-app.json` `{ "database": "postgres" }`
-- Migrations: `001`–`005` (filhos, entidades jsonb, financeiro, obrigações/itens, auth)
-- Local API uses **PGlite** when `DATABASE_URL` is unset
-- Production DB is provisioned on publish when `cursor-app.json` declares database
+Priority at runtime:
 
-Do not commit or paste `DATABASE_URL`.
+1. **Supabase** — `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (optional `SUPABASE_ANON_KEY` for future client use)
+2. **Postgres** — `DATABASE_URL` (Cursor platform DB)
+3. **PGlite** — in-memory local when neither is set
+
+### Apply schema on Supabase
+
+1. Open the project SQL Editor: https://nwvzgtaaezgxmaizzuyw.supabase.co (Project → SQL → New query)
+2. Paste and run the full contents of `supabase/schema.sql` (creates tables, RLS, and `app_sql` RPC used by the server)
+3. Confirm in Table Editor that `filhos`, `cobrancas`, `obrigacoes`, `usuarios`, `sessoes` exist
+
+Do not commit or paste secret keys or `DATABASE_URL`.
+
+Migrations `001`–`005` mirror the same schema for PGlite / Cursor Postgres builds.
 
 ## Cadastro de filhos
 
@@ -43,26 +52,19 @@ Ao agendar/editar tipos, liste **itens** e **quantidade**. Persistidos em `obrig
 
 ## Autenticação e papéis (modelo público + login in-app)
 
-O app pode ser publicado como **público**. O host Cursor não exige login Cursor para abrir a URL; a proteção é o **login in-app** (CPF, e-mail ou celular + senha) com cookie HttpOnly `sr_omulu_sess`.
+O app pode ser publicado como **público**. A proteção é o **login in-app** (CPF, e-mail ou celular + senha) com cookie HttpOnly `sr_omulu_sess`.
 
 | Papel | Acesso |
 |-------|--------|
 | **Administrador** | CRUD filhos, financeiro, obrigações, config, usuários |
-| **Médium** | Somente o próprio filho vinculado (`usuarios.filho_id`): cadastro, obrigações e cobranças; pode marcar pagamento próprio |
+| **Médium** | Somente o próprio filho vinculado (`usuarios.filho_id`) |
 
-APIs de dados exigem sessão de app (`requireAppSession`). Médiuns **não** listam tabelas inteiras — filtro por `filho_id` / ownership em GET, POST, PATCH e DELETE. Cadastro de usuários é só admin.
-
-Login tem throttle por IP+identificador (8 tentativas / 15 min). Cadastro e financeiro **não** são guardados em `localStorage`.
+APIs exigem sessão de app. Médiuns não listam tabelas inteiras — filtro por `filho_id`.
 
 ### Bootstrap do primeiro admin
 
-Criar o primeiro administrador exige o segredo de instalação **`BOOTSTRAP_SECRET`** (body `bootstrapSecret` ou header `x-bootstrap-secret`). Sem o segredo o endpoint responde `503 bootstrap_unavailable`. Depois que **qualquer** linha `role=admin` existir, o endpoint fecha (`403 bootstrap_closed`) — desativar o último admin **não** reabre o bootstrap.
-
-- Publicado: declare o secret no host (`BOOTSTRAP_SECRET` via Cursor app secrets).
-- Local: `export BOOTSTRAP_SECRET=…` antes de `npm run dev`.
-
-Novos usuários depois do bootstrap: tela **Usuários** (só admin). Migration: `migrations/005_auth_usuarios.sql`.
+Exige **`BOOTSTRAP_SECRET`**. Sem o segredo → `503`. Depois que qualquer admin existir → `403 bootstrap_closed`.
 
 ## Publicação
 
-Publicação **pública** é suportada com o modelo acima: sessão de app + papéis + ownership, não só identity do Cursor. Configure `BOOTSTRAP_SECRET` no host antes do primeiro acesso admin.
+Configure secrets no host (`SUPABASE_*`, `BOOTSTRAP_SECRET`) e aplique `supabase/schema.sql` **antes** de republicar para Supabase. Auth/ownership already on `main` stays unchanged.

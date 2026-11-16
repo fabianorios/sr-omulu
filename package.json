@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.16",
+    "@supabase/supabase-js": "^2.119.0",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.511.0",
     "pg": "^8.23.1",

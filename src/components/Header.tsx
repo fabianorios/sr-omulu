@@ -10,6 +10,7 @@ type HeaderProps = {
 const SOURCE_LABEL = {
   sample: 'Dados de exemplo',
   local: 'Rascunho local',
+  supabase: 'Supabase',
   postgres: 'Postgres',
   pglite: 'DB local',
 } as const

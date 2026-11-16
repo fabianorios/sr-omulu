@@ -160,6 +160,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const initial = createInitialState()
 
         if (
+          remoteFilhos.source === 'supabase' ||
           remoteFilhos.source === 'postgres' ||
           remoteFilhos.source === 'pglite'
         ) {
@@ -195,7 +196,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
 
         if (
-          (remoteObr.source === 'postgres' || remoteObr.source === 'pglite') &&
+          (remoteObr.source === 'supabase' ||
+            remoteObr.source === 'postgres' ||
+            remoteObr.source === 'pglite') &&
           remoteObr.obrigacoes.length > 0
         ) {
           next = { ...next, obrigacoes: remoteObr.obrigacoes }
@@ -206,6 +209,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
 
         if (
+          remoteFin.source === 'supabase' ||
           remoteFin.source === 'postgres' ||
           remoteFin.source === 'pglite'
         ) {
@@ -318,7 +322,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ...prev,
           filhos,
           dataSource:
-            prev.dataSource === 'postgres' || prev.dataSource === 'pglite'
+            prev.dataSource === 'supabase' ||
+            prev.dataSource === 'postgres' ||
+            prev.dataSource === 'pglite'
               ? prev.dataSource
               : 'local',
         }

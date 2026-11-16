@@ -4,6 +4,7 @@ import type {
   CobrancaInput,
   CobrancaTipo,
 } from '../types'
+import { parseDbSource, type RemoteDbSource } from './dbSource'
 
 export type CobrancaTipoRow = {
   id: string
@@ -90,7 +91,7 @@ export function cobrancaToPayload(c: CobrancaInput) {
 
 export async function loadCobrancasFromApi(): Promise<
   | {
-      source: 'postgres' | 'pglite'
+      source: RemoteDbSource
       cobrancas: Cobranca[]
       tipos: CobrancaTipo[]
     }
@@ -116,7 +117,7 @@ export async function loadCobrancasFromApi(): Promise<
       tipos?: CobrancaTipoRow[]
     }
     return {
-      source: data.source === 'postgres' ? 'postgres' : 'pglite',
+      source: parseDbSource(data.source),
       cobrancas: (data.cobrancas ?? []).map(rowToCobranca),
       tipos: (data.tipos ?? []).map(rowToCobrancaTipo),
     }
@@ -128,7 +129,7 @@ export async function loadCobrancasFromApi(): Promise<
 export async function createCobrancaViaApi(
   cobranca: CobrancaInput,
 ): Promise<
-  | { ok: true; cobranca: Cobranca; source: 'postgres' | 'pglite' }
+  | { ok: true; cobranca: Cobranca; source: RemoteDbSource }
   | { ok: false; error: string }
 > {
   try {
@@ -149,7 +150,7 @@ export async function createCobrancaViaApi(
     return {
       ok: true,
       cobranca: rowToCobranca(data.cobranca),
-      source: data.source === 'postgres' ? 'postgres' : 'pglite',
+      source: parseDbSource(data.source),
     }
   } catch {
     return { ok: false, error: 'network' }
@@ -160,7 +161,7 @@ export async function updateCobrancaViaApi(
   id: string,
   patch: Partial<CobrancaInput> & { pago?: boolean },
 ): Promise<
-  | { ok: true; cobranca: Cobranca; source: 'postgres' | 'pglite' }
+  | { ok: true; cobranca: Cobranca; source: RemoteDbSource }
   | { ok: false; error: string }
 > {
   try {
@@ -181,7 +182,7 @@ export async function updateCobrancaViaApi(
     return {
       ok: true,
       cobranca: rowToCobranca(data.cobranca),
-      source: data.source === 'postgres' ? 'postgres' : 'pglite',
+      source: parseDbSource(data.source),
     }
   } catch {
     return { ok: false, error: 'network' }
@@ -192,7 +193,7 @@ export async function createCobrancaTipoViaApi(input: {
   nome: string
   categoria: CobrancaCategoria
 }): Promise<
-  | { ok: true; tipo: CobrancaTipo; source: 'postgres' | 'pglite' }
+  | { ok: true; tipo: CobrancaTipo; source: RemoteDbSource }
   | { ok: false; error: string }
 > {
   try {
@@ -213,7 +214,7 @@ export async function createCobrancaTipoViaApi(input: {
     return {
       ok: true,
       tipo: rowToCobrancaTipo(data.tipo),
-      source: data.source === 'postgres' ? 'postgres' : 'pglite',
+      source: parseDbSource(data.source),
     }
   } catch {
     return { ok: false, error: 'network' }
