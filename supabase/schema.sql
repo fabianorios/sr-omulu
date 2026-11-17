@@ -120,7 +120,8 @@ alter table public.sessoes enable row level security;
 -- No anon/authenticated policies: browser never talks to PostgREST directly.
 -- Server uses the service role key (bypasses RLS) via app_sql / supabase-js.
 
--- Bridge so the Node sql() helper can run parameterized statements over PostgREST RPC.
+-- Parameterized SQL bridge (bound via EXECUTE … USING — no string substitution).
+-- Re-run this function definition if you already applied an older schema.sql.
 create or replace function public.app_sql(query text, params jsonb default '[]'::jsonb)
 returns jsonb
 language plpgsql
@@ -128,45 +129,202 @@ security definer
 set search_path = public
 as $$
 declare
-  q text := query;
   n int := coalesce(jsonb_array_length(params), 0);
-  i int;
-  val jsonb;
-  lit text;
   result jsonb;
   trimmed text := ltrim(query);
+  returns_rows boolean;
+  p text[] := array[]::text[];
+  elem jsonb;
 begin
   if trimmed !~* '^(select|insert|update|delete|with)\b' then
     raise exception 'app_sql: disallowed statement';
   end if;
+  if n > 24 then
+    raise exception 'app_sql: too many parameters';
+  end if;
 
-  -- Replace $N placeholders from highest index so $10 is not eaten by $1.
-  for i in reverse 0..greatest(n - 1, 0) loop
-    exit when n = 0;
-    val := params -> i;
-    if val is null or jsonb_typeof(val) = 'null' then
-      lit := 'NULL';
-    elsif jsonb_typeof(val) = 'number' then
-      lit := trim(both '"' from val::text);
-    elsif jsonb_typeof(val) = 'boolean' then
-      lit := val::text;
+  for elem in select value from jsonb_array_elements(params) as t(value)
+  loop
+    if elem is null or jsonb_typeof(elem) = 'null' then
+      p := p || array[null::text];
+    elsif jsonb_typeof(elem) = 'string' then
+      p := p || array[elem #>> '{}'];
+    elsif jsonb_typeof(elem) = 'number' then
+      p := p || array[trim(both '"' from elem::text)];
+    elsif jsonb_typeof(elem) = 'boolean' then
+      p := p || array[elem::text];
     else
-      lit := quote_literal(val #>> '{}');
+      -- object/array JSON passed through for ::jsonb casts in app queries
+      p := p || array[elem::text];
     end if;
-    q := regexp_replace(q, '\$' || (i + 1)::text || '(?!\d)', lit, 'g');
   end loop;
 
-  if trimmed ~* '^(insert|update|delete)\b' and trimmed !~* '\yreturning\y' then
-    execute q;
+  returns_rows := not (
+    trimmed ~* '^(insert|update|delete)\b' and trimmed !~* '\yreturning\y'
+  );
+
+  if not returns_rows then
+    case n
+      when 0 then execute query;
+      when 1 then execute query using p[1];
+      when 2 then execute query using p[1], p[2];
+      when 3 then execute query using p[1], p[2], p[3];
+      when 4 then execute query using p[1], p[2], p[3], p[4];
+      when 5 then execute query using p[1], p[2], p[3], p[4], p[5];
+      when 6 then execute query using p[1], p[2], p[3], p[4], p[5], p[6];
+      when 7 then execute query using p[1], p[2], p[3], p[4], p[5], p[6], p[7];
+      when 8 then execute query using p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8];
+      when 9 then execute query using p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9];
+      when 10 then execute query using p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10];
+      when 11 then execute query using p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11];
+      when 12 then execute query using p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12];
+      when 13 then execute query using p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13];
+      when 14 then execute query using p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14];
+      when 15 then execute query using p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15];
+      when 16 then execute query using p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15], p[16];
+      when 17 then execute query using p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15], p[16], p[17];
+      when 18 then execute query using p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15], p[16], p[17], p[18];
+      when 19 then execute query using p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15], p[16], p[17], p[18], p[19];
+      when 20 then execute query using p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15], p[16], p[17], p[18], p[19], p[20];
+      when 21 then execute query using p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15], p[16], p[17], p[18], p[19], p[20], p[21];
+      when 22 then execute query using p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15], p[16], p[17], p[18], p[19], p[20], p[21], p[22];
+      when 23 then execute query using p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15], p[16], p[17], p[18], p[19], p[20], p[21], p[22], p[23];
+      when 24 then execute query using p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15], p[16], p[17], p[18], p[19], p[20], p[21], p[22], p[23], p[24];
+      else raise exception 'app_sql: too many parameters';
+    end case;
     return '[]'::jsonb;
   end if;
 
-  execute format(
-    'select coalesce(jsonb_agg(row_to_json(t)), ''[]''::jsonb) from (%s) as t',
-    q
-  ) into result;
+  case n
+      when 0 then
+        execute format(
+          'select coalesce(jsonb_agg(row_to_json(t)), ''[]''::jsonb) from (%s) as t',
+          query
+        ) into result;
+      when 1 then
+        execute format(
+          'select coalesce(jsonb_agg(row_to_json(t)), ''[]''::jsonb) from (%s) as t',
+          query
+        ) using p[1] into result;
+      when 2 then
+        execute format(
+          'select coalesce(jsonb_agg(row_to_json(t)), ''[]''::jsonb) from (%s) as t',
+          query
+        ) using p[1], p[2] into result;
+      when 3 then
+        execute format(
+          'select coalesce(jsonb_agg(row_to_json(t)), ''[]''::jsonb) from (%s) as t',
+          query
+        ) using p[1], p[2], p[3] into result;
+      when 4 then
+        execute format(
+          'select coalesce(jsonb_agg(row_to_json(t)), ''[]''::jsonb) from (%s) as t',
+          query
+        ) using p[1], p[2], p[3], p[4] into result;
+      when 5 then
+        execute format(
+          'select coalesce(jsonb_agg(row_to_json(t)), ''[]''::jsonb) from (%s) as t',
+          query
+        ) using p[1], p[2], p[3], p[4], p[5] into result;
+      when 6 then
+        execute format(
+          'select coalesce(jsonb_agg(row_to_json(t)), ''[]''::jsonb) from (%s) as t',
+          query
+        ) using p[1], p[2], p[3], p[4], p[5], p[6] into result;
+      when 7 then
+        execute format(
+          'select coalesce(jsonb_agg(row_to_json(t)), ''[]''::jsonb) from (%s) as t',
+          query
+        ) using p[1], p[2], p[3], p[4], p[5], p[6], p[7] into result;
+      when 8 then
+        execute format(
+          'select coalesce(jsonb_agg(row_to_json(t)), ''[]''::jsonb) from (%s) as t',
+          query
+        ) using p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8] into result;
+      when 9 then
+        execute format(
+          'select coalesce(jsonb_agg(row_to_json(t)), ''[]''::jsonb) from (%s) as t',
+          query
+        ) using p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9] into result;
+      when 10 then
+        execute format(
+          'select coalesce(jsonb_agg(row_to_json(t)), ''[]''::jsonb) from (%s) as t',
+          query
+        ) using p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10] into result;
+      when 11 then
+        execute format(
+          'select coalesce(jsonb_agg(row_to_json(t)), ''[]''::jsonb) from (%s) as t',
+          query
+        ) using p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11] into result;
+      when 12 then
+        execute format(
+          'select coalesce(jsonb_agg(row_to_json(t)), ''[]''::jsonb) from (%s) as t',
+          query
+        ) using p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12] into result;
+      when 13 then
+        execute format(
+          'select coalesce(jsonb_agg(row_to_json(t)), ''[]''::jsonb) from (%s) as t',
+          query
+        ) using p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13] into result;
+      when 14 then
+        execute format(
+          'select coalesce(jsonb_agg(row_to_json(t)), ''[]''::jsonb) from (%s) as t',
+          query
+        ) using p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14] into result;
+      when 15 then
+        execute format(
+          'select coalesce(jsonb_agg(row_to_json(t)), ''[]''::jsonb) from (%s) as t',
+          query
+        ) using p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15] into result;
+      when 16 then
+        execute format(
+          'select coalesce(jsonb_agg(row_to_json(t)), ''[]''::jsonb) from (%s) as t',
+          query
+        ) using p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15], p[16] into result;
+      when 17 then
+        execute format(
+          'select coalesce(jsonb_agg(row_to_json(t)), ''[]''::jsonb) from (%s) as t',
+          query
+        ) using p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15], p[16], p[17] into result;
+      when 18 then
+        execute format(
+          'select coalesce(jsonb_agg(row_to_json(t)), ''[]''::jsonb) from (%s) as t',
+          query
+        ) using p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15], p[16], p[17], p[18] into result;
+      when 19 then
+        execute format(
+          'select coalesce(jsonb_agg(row_to_json(t)), ''[]''::jsonb) from (%s) as t',
+          query
+        ) using p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15], p[16], p[17], p[18], p[19] into result;
+      when 20 then
+        execute format(
+          'select coalesce(jsonb_agg(row_to_json(t)), ''[]''::jsonb) from (%s) as t',
+          query
+        ) using p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15], p[16], p[17], p[18], p[19], p[20] into result;
+      when 21 then
+        execute format(
+          'select coalesce(jsonb_agg(row_to_json(t)), ''[]''::jsonb) from (%s) as t',
+          query
+        ) using p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15], p[16], p[17], p[18], p[19], p[20], p[21] into result;
+      when 22 then
+        execute format(
+          'select coalesce(jsonb_agg(row_to_json(t)), ''[]''::jsonb) from (%s) as t',
+          query
+        ) using p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15], p[16], p[17], p[18], p[19], p[20], p[21], p[22] into result;
+      when 23 then
+        execute format(
+          'select coalesce(jsonb_agg(row_to_json(t)), ''[]''::jsonb) from (%s) as t',
+          query
+        ) using p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15], p[16], p[17], p[18], p[19], p[20], p[21], p[22], p[23] into result;
+      when 24 then
+        execute format(
+          'select coalesce(jsonb_agg(row_to_json(t)), ''[]''::jsonb) from (%s) as t',
+          query
+        ) using p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15], p[16], p[17], p[18], p[19], p[20], p[21], p[22], p[23], p[24] into result;
+    else raise exception 'app_sql: too many parameters';
+  end case;
 
-  return result;
+  return coalesce(result, '[]'::jsonb);
 end;
 $$;
 
