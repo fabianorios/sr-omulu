@@ -1,5 +1,5 @@
--- Supabase-equivalent reference (keep in sync with migrations/).
--- Active Cursor Postgres schema: migrations/001–004.
+-- Senhor Omulu — apply once in Supabase SQL Editor (Project → SQL → New query).
+-- Keep in sync with migrations/001–005. Server uses SUPABASE_SERVICE_ROLE_KEY (bypasses RLS).
 
 create extension if not exists "pgcrypto";
 
@@ -58,6 +58,9 @@ create table if not exists public.cobrancas (
   updated_at timestamptz not null default now()
 );
 
+create index if not exists cobrancas_filho_idx on public.cobrancas (filho_id);
+create index if not exists cobrancas_vencimento_idx on public.cobrancas (vencimento);
+
 create table if not exists public.obrigacoes (
   id uuid primary key default gen_random_uuid(),
   filho_id text not null,
@@ -69,12 +72,9 @@ create table if not exists public.obrigacoes (
   updated_at timestamptz not null default now()
 );
 
-alter table public.filhos enable row level security;
-alter table public.cobranca_tipos enable row level security;
-alter table public.cobrancas enable row level security;
-alter table public.obrigacoes enable row level security;
+create index if not exists obrigacoes_filho_idx on public.obrigacoes (filho_id);
+create index if not exists obrigacoes_data_idx on public.obrigacoes (data);
 
--- Auth (migrations/005)
 create table if not exists public.usuarios (
   id uuid primary key default gen_random_uuid(),
   nome text not null,
@@ -86,8 +86,18 @@ create table if not exists public.usuarios (
   filho_id text,
   ativo boolean not null default true,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  constraint usuarios_identificador_chk check (
+    coalesce(nullif(trim(email), ''), nullif(trim(cpf), ''), nullif(trim(celular), '')) is not null
+  )
 );
+
+create unique index if not exists usuarios_email_uidx
+  on public.usuarios (lower(email)) where email is not null and trim(email) <> '';
+create unique index if not exists usuarios_cpf_uidx
+  on public.usuarios (cpf) where cpf is not null and trim(cpf) <> '';
+create unique index if not exists usuarios_celular_uidx
+  on public.usuarios (celular) where celular is not null and trim(celular) <> '';
 
 create table if not exists public.sessoes (
   id uuid primary key default gen_random_uuid(),
@@ -96,3 +106,70 @@ create table if not exists public.sessoes (
   expires_at timestamptz not null,
   created_at timestamptz not null default now()
 );
+
+create index if not exists sessoes_usuario_idx on public.sessoes (usuario_id);
+create index if not exists sessoes_expires_idx on public.sessoes (expires_at);
+
+alter table public.filhos enable row level security;
+alter table public.cobranca_tipos enable row level security;
+alter table public.cobrancas enable row level security;
+alter table public.obrigacoes enable row level security;
+alter table public.usuarios enable row level security;
+alter table public.sessoes enable row level security;
+
+-- No anon/authenticated policies: browser never talks to PostgREST directly.
+-- Server uses the service role key (bypasses RLS) via app_sql / supabase-js.
+
+-- Bridge so the Node sql() helper can run parameterized statements over PostgREST RPC.
+create or replace function public.app_sql(query text, params jsonb default '[]'::jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  q text := query;
+  n int := coalesce(jsonb_array_length(params), 0);
+  i int;
+  val jsonb;
+  lit text;
+  result jsonb;
+  trimmed text := ltrim(query);
+begin
+  if trimmed !~* '^(select|insert|update|delete|with)\b' then
+    raise exception 'app_sql: disallowed statement';
+  end if;
+
+  -- Replace $N placeholders from highest index so $10 is not eaten by $1.
+  for i in reverse 0..greatest(n - 1, 0) loop
+    exit when n = 0;
+    val := params -> i;
+    if val is null or jsonb_typeof(val) = 'null' then
+      lit := 'NULL';
+    elsif jsonb_typeof(val) = 'number' then
+      lit := trim(both '"' from val::text);
+    elsif jsonb_typeof(val) = 'boolean' then
+      lit := val::text;
+    else
+      lit := quote_literal(val #>> '{}');
+    end if;
+    q := regexp_replace(q, '\$' || (i + 1)::text || '(?!\d)', lit, 'g');
+  end loop;
+
+  if trimmed ~* '^(insert|update|delete)\b' and trimmed !~* '\yreturning\y' then
+    execute q;
+    return '[]'::jsonb;
+  end if;
+
+  execute format(
+    'select coalesce(jsonb_agg(row_to_json(t)), ''[]''::jsonb) from (%s) as t',
+    q
+  ) into result;
+
+  return result;
+end;
+$$;
+
+revoke all on function public.app_sql(text, jsonb) from public;
+revoke all on function public.app_sql(text, jsonb) from anon, authenticated;
+grant execute on function public.app_sql(text, jsonb) to service_role;

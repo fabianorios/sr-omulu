@@ -1,4 +1,5 @@
 import type { Obrigacao, ObrigacaoItem, ObligationTypeId } from '../types'
+import { parseDbSource, type RemoteDbSource } from './dbSource'
 
 export type ObrigacaoRow = {
   id: string
@@ -55,7 +56,7 @@ export function obrigacaoToPayload(o: Omit<Obrigacao, 'id'> & { id?: string }) {
 }
 
 export async function loadObrigacoesFromApi(): Promise<
-  | { source: 'postgres' | 'pglite'; obrigacoes: Obrigacao[] }
+  | { source: RemoteDbSource; obrigacoes: Obrigacao[] }
   | { source: 'error'; obrigacoes: Obrigacao[]; error: string }
 > {
   try {
@@ -71,7 +72,7 @@ export async function loadObrigacoesFromApi(): Promise<
       obrigacoes?: ObrigacaoRow[]
     }
     return {
-      source: data.source === 'postgres' ? 'postgres' : 'pglite',
+      source: parseDbSource(data.source),
       obrigacoes: (data.obrigacoes ?? []).map(rowToObrigacao),
     }
   } catch {
@@ -82,7 +83,7 @@ export async function loadObrigacoesFromApi(): Promise<
 export async function createObrigacaoViaApi(
   obrigacao: Omit<Obrigacao, 'id'> & { id?: string },
 ): Promise<
-  | { ok: true; obrigacao: Obrigacao; source: 'postgres' | 'pglite' }
+  | { ok: true; obrigacao: Obrigacao; source: RemoteDbSource }
   | { ok: false; error: string }
 > {
   try {
@@ -103,7 +104,7 @@ export async function createObrigacaoViaApi(
     return {
       ok: true,
       obrigacao: rowToObrigacao(data.obrigacao),
-      source: data.source === 'postgres' ? 'postgres' : 'pglite',
+      source: parseDbSource(data.source),
     }
   } catch {
     return { ok: false, error: 'network' }
@@ -114,7 +115,7 @@ export async function updateObrigacaoViaApi(
   id: string,
   patch: Partial<Obrigacao>,
 ): Promise<
-  | { ok: true; obrigacao: Obrigacao; source: 'postgres' | 'pglite' }
+  | { ok: true; obrigacao: Obrigacao; source: RemoteDbSource }
   | { ok: false; error: string }
 > {
   try {
@@ -141,7 +142,7 @@ export async function updateObrigacaoViaApi(
     return {
       ok: true,
       obrigacao: rowToObrigacao(data.obrigacao),
-      source: data.source === 'postgres' ? 'postgres' : 'pglite',
+      source: parseDbSource(data.source),
     }
   } catch {
     return { ok: false, error: 'network' }

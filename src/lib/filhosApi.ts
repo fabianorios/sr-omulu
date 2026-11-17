@@ -6,6 +6,7 @@ import {
 } from '../data/catalog'
 import type { EntidadeLinha, Filho, FilhoInput } from '../types'
 import { emptyEndereco } from '../types'
+import { parseDbSource, type RemoteDbSource } from './dbSource'
 import { normalizeEntidades, sanitizeEntidadesForSave } from './entidades'
 
 /** Shape returned by /api/filhos (snake_case from Postgres). */
@@ -112,7 +113,7 @@ export function filhoToPayload(filho: FilhoInput) {
 }
 
 export type LoadFilhosResult =
-  | { source: 'postgres' | 'pglite'; filhos: Filho[] }
+  | { source: RemoteDbSource; filhos: Filho[] }
   | { source: 'error'; filhos: Filho[]; error: string }
 
 export async function loadFilhosFromApi(): Promise<LoadFilhosResult> {
@@ -129,9 +130,8 @@ export async function loadFilhosFromApi(): Promise<LoadFilhosResult> {
       source?: string
       filhos?: FilhoRow[]
     }
-    const source = data.source === 'postgres' ? 'postgres' : 'pglite'
     return {
-      source,
+      source: parseDbSource(data.source),
       filhos: (data.filhos ?? []).map(rowToFilho),
     }
   } catch {
@@ -142,7 +142,7 @@ export async function loadFilhosFromApi(): Promise<LoadFilhosResult> {
 export async function createFilhoViaApi(
   filho: FilhoInput,
 ): Promise<
-  | { ok: true; filho: Filho; source: 'postgres' | 'pglite' }
+  | { ok: true; filho: Filho; source: RemoteDbSource }
   | { ok: false; error: string }
 > {
   try {
@@ -163,7 +163,7 @@ export async function createFilhoViaApi(
     return {
       ok: true,
       filho: rowToFilho(data.filho),
-      source: data.source === 'postgres' ? 'postgres' : 'pglite',
+      source: parseDbSource(data.source),
     }
   } catch {
     return { ok: false, error: 'network' }
@@ -174,7 +174,7 @@ export async function updateFilhoViaApi(
   id: string,
   filho: FilhoInput,
 ): Promise<
-  | { ok: true; filho: Filho; source: 'postgres' | 'pglite' }
+  | { ok: true; filho: Filho; source: RemoteDbSource }
   | { ok: false; error: string }
 > {
   try {
@@ -195,7 +195,7 @@ export async function updateFilhoViaApi(
     return {
       ok: true,
       filho: rowToFilho(data.filho),
-      source: data.source === 'postgres' ? 'postgres' : 'pglite',
+      source: parseDbSource(data.source),
     }
   } catch {
     return { ok: false, error: 'network' }
