@@ -5,8 +5,14 @@ import { Logo } from '../components/Logo'
 import { MandalaOrixas } from '../components/MandalaOrixas'
 
 export function Login() {
-  const { login, bootstrap, needsBootstrap, loading, browserSupabase } =
-    useAuth()
+  const {
+    login,
+    bootstrap,
+    needsBootstrap,
+    loading,
+    browserSupabase,
+    pagesMissingVite,
+  } = useAuth()
   const [nome, setNome] = useState('')
   const [identificador, setIdentificador] = useState('')
   const [senha, setSenha] = useState('')
@@ -14,38 +20,50 @@ export function Login() {
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
+  const errorMap: Record<string, string> = {
+    invalid_credentials: 'Identificador ou senha incorretos.',
+    nome_identificador_senha_min_8:
+      'Nome, identificador e senha (mín. 8) são obrigatórios.',
+    bootstrap_closed: 'Já existe administrador. Faça login.',
+    invalid_bootstrap_secret: 'Código de instalação inválido.',
+    bootstrap_unavailable:
+      'Bootstrap indisponível. Configure o segredo com set_bootstrap_secret no SQL Editor.',
+    identificador_senha_required: 'Preencha identificador e senha.',
+    too_many_attempts:
+      'Muitas tentativas. Aguarde alguns minutos e tente de novo.',
+    api_unreachable:
+      'API de login indisponível neste host. Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no Cloudflare Pages (Build variables) e faça Redeploy.',
+    pages_missing_vite:
+      'Deploy sem VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY. No Cloudflare Pages → Settings → Environment variables (Production, Build), adicione as duas, salve e Redeploy main.',
+    server_error:
+      'Servidor indisponível. Confirme schema/RLS e variáveis VITE_* no Pages.',
+    email_required_pages:
+      'Neste host use e-mail (não CPF/celular) + senha do Supabase Auth.',
+    email_confirm_required:
+      'Confirme o e-mail no link do Supabase, ou desative “Confirm email” em Authentication → Providers.',
+    supabase_unconfigured:
+      'Supabase do browser não configurado (faltam VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY).',
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError('')
+    if (pagesMissingVite) {
+      setError(errorMap.pages_missing_vite)
+      return
+    }
     setSaving(true)
-    const result = needsBootstrap
-      ? await bootstrap({ nome, identificador, senha, bootstrapSecret })
-      : await login(identificador, senha)
-    setSaving(false)
-    if (!result.ok) {
-      const map: Record<string, string> = {
-        invalid_credentials: 'Identificador ou senha incorretos.',
-        nome_identificador_senha_min_8:
-          'Nome, identificador e senha (mín. 8) são obrigatórios.',
-        bootstrap_closed: 'Já existe administrador. Faça login.',
-        invalid_bootstrap_secret: 'Código de instalação inválido.',
-        bootstrap_unavailable:
-          'Bootstrap indisponível. Configure BOOTSTRAP_SECRET no host.',
-        identificador_senha_required: 'Preencha identificador e senha.',
-        too_many_attempts:
-          'Muitas tentativas. Aguarde alguns minutos e tente de novo.',
-        api_unreachable:
-          'API de login indisponível. Em https://sr-omulu.pages.dev configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no Cloudflare Pages e reaplique o deploy.',
-        server_error:
-          'Servidor indisponível. Confirme schema/RLS e variáveis VITE_* no Pages.',
-        email_required_pages:
-          'Neste host use e-mail (não CPF/celular) + senha do Supabase Auth.',
-        email_confirm_required:
-          'Confirme o e-mail no link do Supabase, ou desative “Confirm email” em Authentication → Providers.',
-        supabase_unconfigured:
-          'Supabase do browser não configurado (faltam VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY).',
+    try {
+      const result = needsBootstrap
+        ? await bootstrap({ nome, identificador, senha, bootstrapSecret })
+        : await login(identificador, senha)
+      if (!result.ok) {
+        setError(errorMap[result.error ?? ''] ?? 'Não foi possível entrar.')
       }
-      setError(map[result.error ?? ''] ?? 'Não foi possível entrar.')
+    } catch {
+      setError(errorMap.api_unreachable)
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -129,6 +147,14 @@ export function Login() {
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-4">
+                {pagesMissingVite ? (
+                  <p
+                    role="alert"
+                    className="rounded-lg bg-[#f5e0e0] px-3 py-2 text-sm text-[#9b3a3a]"
+                  >
+                    {errorMap.pages_missing_vite}
+                  </p>
+                ) : null}
                 {needsBootstrap ? (
                   <>
                     <label className="block">
@@ -220,7 +246,7 @@ export function Login() {
 
                 <button
                   type="submit"
-                  disabled={saving}
+                  disabled={saving || pagesMissingVite}
                   className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#1A3628] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#12261C] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1A3628] disabled:opacity-60"
                 >
                   {saving ? (

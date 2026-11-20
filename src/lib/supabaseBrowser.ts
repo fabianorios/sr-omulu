@@ -18,6 +18,14 @@ export function supabaseBrowserConfigured(): boolean {
   return Boolean(url && anon)
 }
 
+/**
+ * Production static host (Cloudflare Pages) without VITE_* baked at build time.
+ * In that case /api/* does not exist — skip fetches and fail fast in the UI.
+ */
+export function pagesMissingViteConfig(): boolean {
+  return !import.meta.env.DEV && !supabaseBrowserConfigured()
+}
+
 /** Browser Supabase client (anon key only). Null when VITE_* unset (local /api mode). */
 export function getSupabaseBrowser(): SupabaseClient | null {
   if (!supabaseBrowserConfigured()) return null
