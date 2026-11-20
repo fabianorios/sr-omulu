@@ -5,6 +5,13 @@ import type {
   CobrancaTipo,
 } from '../types'
 import { parseDbSource, type RemoteDbSource } from './dbSource'
+import { supabaseBrowserConfigured } from './supabaseBrowser'
+import {
+  sbCreateCobranca,
+  sbCreateCobrancaTipo,
+  sbLoadCobrancas,
+  sbUpdateCobranca,
+} from './supabaseData'
 
 export type CobrancaTipoRow = {
   id: string
@@ -98,6 +105,22 @@ export async function loadCobrancasFromApi(): Promise<
   | { source: 'error'; cobrancas: Cobranca[]; tipos: CobrancaTipo[]; error: string }
 > {
   clearLocalCobrancasCache()
+  if (supabaseBrowserConfigured()) {
+    const remote = await sbLoadCobrancas()
+    if (remote.ok === false) {
+      return {
+        source: 'error',
+        cobrancas: [],
+        tipos: [],
+        error: remote.error,
+      }
+    }
+    return {
+      source: 'supabase',
+      cobrancas: remote.cobrancas.map(rowToCobranca),
+      tipos: remote.tipos.map(rowToCobrancaTipo),
+    }
+  }
   try {
     const res = await fetch('/api/cobrancas', { credentials: 'same-origin' })
     if (res.status === 401) {
@@ -132,6 +155,15 @@ export async function createCobrancaViaApi(
   | { ok: true; cobranca: Cobranca; source: RemoteDbSource }
   | { ok: false; error: string }
 > {
+  if (supabaseBrowserConfigured()) {
+    const remote = await sbCreateCobranca(cobranca)
+    if (remote.ok === false) return { ok: false, error: remote.error }
+    return {
+      ok: true,
+      cobranca: rowToCobranca(remote.row),
+      source: 'supabase',
+    }
+  }
   try {
     const res = await fetch('/api/cobrancas', {
       method: 'POST',
@@ -164,6 +196,15 @@ export async function updateCobrancaViaApi(
   | { ok: true; cobranca: Cobranca; source: RemoteDbSource }
   | { ok: false; error: string }
 > {
+  if (supabaseBrowserConfigured()) {
+    const remote = await sbUpdateCobranca(id, patch)
+    if (remote.ok === false) return { ok: false, error: remote.error }
+    return {
+      ok: true,
+      cobranca: rowToCobranca(remote.row),
+      source: 'supabase',
+    }
+  }
   try {
     const res = await fetch(`/api/cobrancas/${encodeURIComponent(id)}`, {
       method: 'PATCH',
@@ -196,6 +237,15 @@ export async function createCobrancaTipoViaApi(input: {
   | { ok: true; tipo: CobrancaTipo; source: RemoteDbSource }
   | { ok: false; error: string }
 > {
+  if (supabaseBrowserConfigured()) {
+    const remote = await sbCreateCobrancaTipo(input)
+    if (remote.ok === false) return { ok: false, error: remote.error }
+    return {
+      ok: true,
+      tipo: rowToCobrancaTipo(remote.row),
+      source: 'supabase',
+    }
+  }
   try {
     const res = await fetch('/api/cobranca-tipos', {
       method: 'POST',

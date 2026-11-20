@@ -1,5 +1,11 @@
 import type { Obrigacao, ObrigacaoItem, ObligationTypeId } from '../types'
 import { parseDbSource, type RemoteDbSource } from './dbSource'
+import { supabaseBrowserConfigured } from './supabaseBrowser'
+import {
+  sbCreateObrigacao,
+  sbLoadObrigacoes,
+  sbUpdateObrigacao,
+} from './supabaseData'
 
 export type ObrigacaoRow = {
   id: string
@@ -59,6 +65,16 @@ export async function loadObrigacoesFromApi(): Promise<
   | { source: RemoteDbSource; obrigacoes: Obrigacao[] }
   | { source: 'error'; obrigacoes: Obrigacao[]; error: string }
 > {
+  if (supabaseBrowserConfigured()) {
+    const remote = await sbLoadObrigacoes()
+    if (remote.ok === false) {
+      return { source: 'error', obrigacoes: [], error: remote.error }
+    }
+    return {
+      source: 'supabase',
+      obrigacoes: remote.rows.map(rowToObrigacao),
+    }
+  }
   try {
     const res = await fetch('/api/obrigacoes', { credentials: 'same-origin' })
     if (res.status === 401) {
@@ -86,6 +102,15 @@ export async function createObrigacaoViaApi(
   | { ok: true; obrigacao: Obrigacao; source: RemoteDbSource }
   | { ok: false; error: string }
 > {
+  if (supabaseBrowserConfigured()) {
+    const remote = await sbCreateObrigacao(obrigacao)
+    if (remote.ok === false) return { ok: false, error: remote.error }
+    return {
+      ok: true,
+      obrigacao: rowToObrigacao(remote.row),
+      source: 'supabase',
+    }
+  }
   try {
     const res = await fetch('/api/obrigacoes', {
       method: 'POST',
@@ -118,6 +143,15 @@ export async function updateObrigacaoViaApi(
   | { ok: true; obrigacao: Obrigacao; source: RemoteDbSource }
   | { ok: false; error: string }
 > {
+  if (supabaseBrowserConfigured()) {
+    const remote = await sbUpdateObrigacao(id, patch)
+    if (remote.ok === false) return { ok: false, error: remote.error }
+    return {
+      ok: true,
+      obrigacao: rowToObrigacao(remote.row),
+      source: 'supabase',
+    }
+  }
   try {
     const body: Record<string, unknown> = {}
     if (patch.filhoId != null) body.filhoId = patch.filhoId
