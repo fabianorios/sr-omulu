@@ -71,6 +71,10 @@ No Pages o login é **e-mail + senha** (Supabase Auth). CPF/celular ficam só no
 3. O código deve ser o mesmo passado a `set_bootstrap_secret`
 4. Depois do primeiro admin, o bootstrap fecha (`bootstrap_closed`)
 
+### Administradores adicionais
+
+Após o bootstrap: **Usuários → Novo administrador** (e-mail, nome, senha temporária). O browser chama `signUp` (anon, cliente efêmero) + RPC `create_admin` (somente se `current_app_role() = 'admin'`). Sem `service_role` no Pages. Se o SQL já foi aplicado sem essa função, rode `supabase/create-admin.sql`.
+
 ## Local (sem Pages)
 
 Sem `VITE_*`, `npm run dev` usa as rotas `/api/*` (PGlite ou server Supabase com `SUPABASE_SERVICE_ROLE_KEY` + `BOOTSTRAP_SECRET`). Ver `.env.example`.
