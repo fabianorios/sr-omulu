@@ -43,8 +43,16 @@ export function getSupabaseBrowser(): SupabaseClient | null {
 }
 
 export function mapProfile(raw: unknown): BrowserProfile | null {
-  if (!raw || typeof raw !== 'object') return null
-  const r = raw as Record<string, unknown>
+  let value: unknown = raw
+  if (typeof value === 'string') {
+    try {
+      value = JSON.parse(value)
+    } catch {
+      return null
+    }
+  }
+  if (!value || typeof value !== 'object') return null
+  const r = value as Record<string, unknown>
   const role = r.role === 'admin' ? 'admin' : r.role === 'medium' ? 'medium' : null
   if (!role || !r.id || !r.nome) return null
   return {
@@ -58,15 +66,34 @@ export function mapProfile(raw: unknown): BrowserProfile | null {
   }
 }
 
-export function rpcErrorCode(error: { message?: string } | null): string {
+export function rpcErrorCode(error: {
+  message?: string
+  code?: string
+  details?: string
+  hint?: string
+} | null): { code: string; detail: string } {
+  const detail = [error?.message, error?.details, error?.hint, error?.code]
+    .filter(Boolean)
+    .join(' · ')
   const msg = (error?.message ?? '').toLowerCase()
-  if (msg.includes('bootstrap_closed')) return 'bootstrap_closed'
-  if (msg.includes('invalid_bootstrap_secret')) return 'invalid_bootstrap_secret'
-  if (msg.includes('bootstrap_unavailable')) return 'bootstrap_unavailable'
-  if (msg.includes('not_authenticated')) return 'not_authenticated'
-  if (msg.includes('nome_required')) return 'nome_identificador_senha_min_8'
-  if (msg.includes('email')) return 'invalid_credentials'
-  return 'auth_failed'
+  if (msg.includes('bootstrap_closed')) {
+    return { code: 'bootstrap_closed', detail }
+  }
+  if (msg.includes('invalid_bootstrap_secret')) {
+    return { code: 'invalid_bootstrap_secret', detail }
+  }
+  if (msg.includes('bootstrap_unavailable')) {
+    return { code: 'bootstrap_unavailable', detail }
+  }
+  if (msg.includes('not_authenticated')) {
+    return { code: 'not_authenticated', detail }
+  }
+  if (msg.includes('nome_required')) {
+    return { code: 'nome_identificador_senha_min_8', detail }
+  }
+  // Do not map arbitrary "email" substrings to invalid_credentials —
+  // claim/Auth errors often mention email without being a bad password.
+  return { code: 'auth_failed', detail: detail || 'auth_failed' }
 }
 
 function isEmailNotConfirmed(error: {

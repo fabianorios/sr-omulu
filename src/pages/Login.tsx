@@ -47,6 +47,23 @@ export function Login() {
       'Não foi possível abrir sessão Auth. Verifique Confirm email desligado e tente de novo (ou use Entrar se a conta já existir).',
     supabase_unconfigured:
       'Supabase do browser não configurado (faltam VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY).',
+    bootstrap_failed:
+      'Falha ao criar administrador (Auth ok, mas claim_bootstrap/perfil falhou).',
+    auth_failed:
+      'Falha no Auth/RPC. Veja o detalhe abaixo (secret, claim_bootstrap, pgcrypto).',
+    not_authenticated:
+      'Sessão Auth ausente ao chamar claim_bootstrap. Tente de novo.',
+    login_failed: 'Login falhou.',
+  }
+
+  function formatAuthError(code?: string, detail?: string): string {
+    const base =
+      errorMap[code ?? ''] ??
+      `Não foi possível entrar. [${code || 'unknown'}]`
+    if (detail && detail.trim() && detail !== code) {
+      return `${base} — ${detail}`
+    }
+    return base
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -62,10 +79,15 @@ export function Login() {
         ? await bootstrap({ nome, identificador, senha, bootstrapSecret })
         : await login(identificador, senha)
       if (!result.ok) {
-        setError(errorMap[result.error ?? ''] ?? 'Não foi possível entrar.')
+        setError(formatAuthError(result.error, result.detail))
       }
-    } catch {
-      setError(errorMap.api_unreachable)
+    } catch (err) {
+      setError(
+        formatAuthError(
+          'api_unreachable',
+          err instanceof Error ? err.message : undefined,
+        ),
+      )
     } finally {
       setSaving(false)
     }
