@@ -2,6 +2,10 @@
 -- Apply AFTER supabase/schema.sql in the SQL Editor.
 -- Never expose the service_role key to the browser / VITE_*.
 
+-- Supabase installs pgcrypto in schema `extensions` (not public).
+-- Without this, set_bootstrap_secret fails: gen_salt does not exist.
+create extension if not exists pgcrypto with schema extensions;
+
 -- Link app users to Supabase Auth
 alter table public.usuarios
   add column if not exists auth_user_id uuid unique references auth.users (id) on delete cascade;
@@ -29,14 +33,17 @@ create or replace function public.set_bootstrap_secret(raw text)
 returns void
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 begin
   if raw is null or length(trim(raw)) < 8 then
     raise exception 'bootstrap_secret_too_short';
   end if;
   insert into public.app_settings (key, value)
-  values ('bootstrap_secret_hash', crypt(trim(raw), gen_salt('bf')))
+  values (
+    'bootstrap_secret_hash',
+    extensions.crypt(trim(raw), extensions.gen_salt('bf'))
+  )
   on conflict (key) do update
     set value = excluded.value, updated_at = now();
 end;
@@ -93,7 +100,7 @@ create or replace function public.claim_bootstrap(install_code text, p_nome text
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   uid uuid := auth.uid();
@@ -114,7 +121,7 @@ begin
     raise exception 'bootstrap_unavailable';
   end if;
   if install_code is null
-     or crypt(trim(install_code), expected) is distinct from expected then
+     or extensions.crypt(trim(install_code), expected) is distinct from expected then
     raise exception 'invalid_bootstrap_secret';
   end if;
   if p_nome is null or length(trim(p_nome)) < 1 then
