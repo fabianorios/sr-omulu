@@ -54,13 +54,13 @@ type AuthContextValue = {
   login: (
     identificador: string,
     senha: string,
-  ) => Promise<{ ok: boolean; error?: string }>
+  ) => Promise<{ ok: boolean; error?: string; detail?: string }>
   bootstrap: (input: {
     nome: string
     identificador: string
     senha: string
     bootstrapSecret: string
-  }) => Promise<{ ok: boolean; error?: string }>
+  }) => Promise<{ ok: boolean; error?: string; detail?: string }>
   logout: () => Promise<void>
   refresh: () => Promise<void>
 }
@@ -187,7 +187,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           password: senha,
         })
         if (error) {
-          return { ok: false, error: 'invalid_credentials' }
+          return {
+            ok: false,
+            error: 'invalid_credentials',
+            detail: error.message,
+          }
         }
         await refreshBrowser()
         return { ok: true }
@@ -209,13 +213,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         const data = parsed.data
         if (!res.ok || !data.user) {
-          return { ok: false, error: data.error ?? 'login_failed' }
+          return {
+            ok: false,
+            error: data.error ?? 'login_failed',
+            detail: data.error,
+          }
         }
         setUser(data.user)
         setNeedsBootstrap(false)
         return { ok: true }
-      } catch {
-        return { ok: false, error: 'api_unreachable' }
+      } catch (e) {
+        return {
+          ok: false,
+          error: 'api_unreachable',
+          detail: e instanceof Error ? e.message : undefined,
+        }
       }
     },
     [browserSupabase, pagesMissingVite, refreshBrowser],
@@ -255,10 +267,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           },
         )
         if (claimError) {
-          return { ok: false, error: rpcErrorCode(claimError) }
+          const mappedErr = rpcErrorCode(claimError)
+          return {
+            ok: false,
+            error: mappedErr.code,
+            detail: mappedErr.detail,
+          }
         }
         const mapped = mapProfile(profile)
-        if (!mapped) return { ok: false, error: 'bootstrap_failed' }
+        if (!mapped) {
+          return {
+            ok: false,
+            error: 'bootstrap_failed',
+            detail: `claim_bootstrap returned unusable profile: ${typeof profile === 'string' ? profile : JSON.stringify(profile)}`,
+          }
+        }
         setUser(mapped)
         setNeedsBootstrap(false)
         return { ok: true }
@@ -285,13 +308,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         const data = parsed.data
         if (!res.ok || !data.user) {
-          return { ok: false, error: data.error ?? 'bootstrap_failed' }
+          return {
+            ok: false,
+            error: data.error ?? 'bootstrap_failed',
+            detail: data.error,
+          }
         }
         setUser(data.user)
         setNeedsBootstrap(false)
         return { ok: true }
-      } catch {
-        return { ok: false, error: 'api_unreachable' }
+      } catch (e) {
+        return {
+          ok: false,
+          error: 'api_unreachable',
+          detail: e instanceof Error ? e.message : undefined,
+        }
       }
     },
     [browserSupabase, pagesMissingVite],
