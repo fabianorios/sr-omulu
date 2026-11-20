@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react'
-import { Loader2, Lock } from 'lucide-react'
+import { Loader2, Lock, UserRound } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { Logo } from '../components/Logo'
+import { MandalaOrixas } from '../components/MandalaOrixas'
 
 export function Login() {
   const { login, bootstrap, needsBootstrap, loading } = useAuth()
@@ -39,101 +40,176 @@ export function Login() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-sm text-[var(--color-ink-muted)]">
+      <div className="flex min-h-screen items-center justify-center bg-[#F6F3EB] text-sm text-[#5c5348]">
         Carregando…
       </div>
     )
   }
 
+  const fieldClass =
+    'w-full rounded-lg border border-[#D6D3C9] bg-white px-3.5 py-2.5 text-sm text-[#1E2B24] shadow-sm outline-none transition placeholder:text-[#8a7f70] focus:border-[#1A3628] focus:ring-2 focus:ring-[#1A3628]/15'
+
+  const labelClass =
+    'mb-1.5 block text-xs font-semibold tracking-wide text-[#5c5348] uppercase'
+
   return (
-    <div className="flex min-h-screen items-center justify-center px-4 py-10">
-      <div className="w-full max-w-md rounded-lg border border-[var(--color-border)] bg-[var(--color-cream)]/90 p-6 shadow-sm">
-        <div className="mb-6 flex flex-col items-center text-center">
-          <Logo size={96} />
-          <h1 className="mt-3 font-serif text-2xl font-semibold text-[var(--color-forest)]">
-            {needsBootstrap ? 'Criar administrador' : 'Entrar'}
-          </h1>
-          <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-            {needsBootstrap
-              ? 'Primeiro acesso: informe o código de instalação (BOOTSTRAP_SECRET) e cadastre o administrador.'
-              : 'Use CPF, e-mail ou celular e sua senha.'}
-          </p>
-        </div>
+    <div className="relative min-h-screen overflow-hidden bg-[#F6F3EB]">
+      {/* Subtle brand gradient — warm off-white, forest tint */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background: `
+            radial-gradient(ellipse 55% 45% at 18% 42%, rgba(26, 54, 40, 0.06), transparent 70%),
+            radial-gradient(ellipse 50% 40% at 88% 12%, rgba(140, 122, 91, 0.1), transparent 65%),
+            linear-gradient(165deg, #F8F5ED 0%, #F6F3EB 45%, #F0EBE0 100%)
+          `,
+        }}
+      />
 
-        <form onSubmit={handleSubmit} className="space-y-3">
-          {needsBootstrap ? (
-            <>
-              <label className="block">
-                <span className="mb-1 block text-xs font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase">
-                  Código de instalação
-                </span>
-                <input
-                  required
-                  type="password"
-                  value={bootstrapSecret}
-                  onChange={(e) => setBootstrapSecret(e.target.value)}
-                  className="w-full rounded-md border border-[var(--color-border)] bg-white px-3 py-2 text-sm"
-                  autoComplete="off"
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-xs font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase">
-                  Nome
-                </span>
-                <input
-                  required
-                  value={nome}
-                  onChange={(e) => setNome(e.target.value)}
-                  className="w-full rounded-md border border-[var(--color-border)] bg-white px-3 py-2 text-sm"
-                />
-              </label>
-            </>
-          ) : null}
+      {/* Mobile watermark mandala */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 flex items-center justify-center lg:hidden"
+      >
+        <MandalaOrixas
+          watermark
+          className="h-[min(92vw,520px)] w-[min(92vw,520px)]"
+        />
+      </div>
 
-          <label className="block">
-            <span className="mb-1 block text-xs font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase">
-              CPF, e-mail ou celular
-            </span>
-            <input
-              required
-              value={identificador}
-              onChange={(e) => setIdentificador(e.target.value)}
-              placeholder="email@casa.org · 000.000.000-00 · (11) 90000-0000"
-              className="w-full rounded-md border border-[var(--color-border)] bg-white px-3 py-2 text-sm"
-              autoComplete="username"
-            />
-          </label>
+      <div className="relative z-10 flex min-h-screen flex-col lg:flex-row">
+        {/* Desktop mandala panel ~42% */}
+        <aside className="hidden lg:flex lg:w-[42%] lg:items-center lg:justify-center lg:px-6 lg:py-10 xl:px-10">
+          <MandalaOrixas className="h-auto w-full max-w-[560px] animate-fade-in" />
+        </aside>
 
-          <label className="block">
-            <span className="mb-1 block text-xs font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase">
-              Senha
-            </span>
-            <input
-              required
-              type="password"
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-              minLength={needsBootstrap ? 8 : 1}
-              className="w-full rounded-md border border-[var(--color-border)] bg-white px-3 py-2 text-sm"
-              autoComplete={needsBootstrap ? 'new-password' : 'current-password'}
-            />
-          </label>
+        {/* Login panel ~58% — pulled toward mandala on large screens */}
+        <main className="flex flex-1 flex-col items-center justify-center px-4 py-10 sm:px-6 lg:w-[58%] lg:items-start lg:justify-center lg:pl-2 lg:pr-10 xl:pl-4 xl:pr-16">
+          <div className="w-full max-w-md animate-fade-in lg:max-w-[420px]">
+            <header className="mb-6 text-center lg:mb-7 lg:text-left">
+              <h1 className="font-serif text-2xl leading-tight font-semibold text-[#1E2B24] sm:text-3xl">
+                T.U. Sr. Omulu — Irmãos de Fé
+              </h1>
+              <p className="mt-2 text-sm text-[#5c5348]">
+                {needsBootstrap
+                  ? 'Primeiro acesso: cadastre o administrador da casa.'
+                  : 'Acesso para administração e médiuns da casa.'}
+              </p>
+            </header>
 
-          {error ? (
-            <p className="text-sm text-[var(--color-status-vencida-fg)]">
-              {error}
-            </p>
-          ) : null}
+            <div className="w-full max-w-[420px] rounded-2xl border border-[#D6D3C9] bg-[#FAF8F2] p-8 shadow-md animate-fade-in-delay-1">
+              <div className="mb-6 flex flex-col items-center text-center">
+                <Logo size={120} className="drop-shadow-sm" />
+                <h2 className="mt-4 font-serif text-xl font-semibold text-[#1A3628]">
+                  {needsBootstrap ? 'Criar administrador' : 'Entrar'}
+                </h2>
+                <p className="mt-1.5 max-w-xs text-sm text-[#5c5348]">
+                  {needsBootstrap
+                    ? 'Informe o código de instalação (BOOTSTRAP_SECRET) e os dados do administrador.'
+                    : 'Use CPF, e-mail ou celular e sua senha.'}
+                </p>
+              </div>
 
-          <button
-            type="submit"
-            disabled={saving}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-[var(--color-forest)] px-4 py-2.5 text-sm font-semibold text-[var(--color-cream)] disabled:opacity-60"
-          >
-            {saving ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />}
-            {needsBootstrap ? 'Criar administrador' : 'Entrar'}
-          </button>
-        </form>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {needsBootstrap ? (
+                  <>
+                    <label className="block">
+                      <span className={labelClass}>Código de instalação</span>
+                      <input
+                        required
+                        type="password"
+                        value={bootstrapSecret}
+                        onChange={(e) => setBootstrapSecret(e.target.value)}
+                        className={fieldClass}
+                        autoComplete="off"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className={labelClass}>Nome</span>
+                      <div className="relative">
+                        <UserRound
+                          size={16}
+                          className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-[#8C7A5B]"
+                          aria-hidden
+                        />
+                        <input
+                          required
+                          value={nome}
+                          onChange={(e) => setNome(e.target.value)}
+                          className={`${fieldClass} pl-9`}
+                        />
+                      </div>
+                    </label>
+                  </>
+                ) : null}
+
+                <label className="block">
+                  <span className={labelClass}>CPF, e-mail ou celular</span>
+                  <div className="relative">
+                    <UserRound
+                      size={16}
+                      className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-[#8C7A5B]"
+                      aria-hidden
+                    />
+                    <input
+                      required
+                      value={identificador}
+                      onChange={(e) => setIdentificador(e.target.value)}
+                      placeholder="email@casa.org · 000.000.000-00 · (11) 90000-0000"
+                      className={`${fieldClass} pl-9`}
+                      autoComplete="username"
+                    />
+                  </div>
+                </label>
+
+                <label className="block">
+                  <span className={labelClass}>Senha</span>
+                  <div className="relative">
+                    <Lock
+                      size={16}
+                      className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-[#8C7A5B]"
+                      aria-hidden
+                    />
+                    <input
+                      required
+                      type="password"
+                      value={senha}
+                      onChange={(e) => setSenha(e.target.value)}
+                      minLength={needsBootstrap ? 8 : 1}
+                      className={`${fieldClass} pl-9`}
+                      autoComplete={
+                        needsBootstrap ? 'new-password' : 'current-password'
+                      }
+                    />
+                  </div>
+                </label>
+
+                {error ? (
+                  <p
+                    role="alert"
+                    className="rounded-lg bg-[#f5e0e0] px-3 py-2 text-sm text-[#9b3a3a]"
+                  >
+                    {error}
+                  </p>
+                ) : null}
+
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#1A3628] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#12261C] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1A3628] disabled:opacity-60"
+                >
+                  {saving ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <Lock size={16} />
+                  )}
+                  {needsBootstrap ? 'Criar administrador' : 'Entrar'}
+                </button>
+              </form>
+            </div>
+          </div>
+        </main>
       </div>
     </div>
   )
