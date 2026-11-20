@@ -15,10 +15,19 @@ export async function readApiJson<T extends Record<string, unknown>>(
   ) {
     return { ok: false, error: 'api_unreachable' }
   }
+  if (!text.trim()) {
+    if (res.status === 405 || res.status === 404 || res.status >= 500) {
+      return { ok: false, error: 'api_unreachable' }
+    }
+    return { ok: false, error: 'invalid_json' }
+  }
   try {
     return { ok: true, data: JSON.parse(text) as T }
   } catch {
     if (res.status >= 500) return { ok: false, error: 'server_error' }
+    if (res.status === 405 || res.status === 404) {
+      return { ok: false, error: 'api_unreachable' }
+    }
     return { ok: false, error: 'invalid_json' }
   }
 }
