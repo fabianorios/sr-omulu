@@ -71,9 +71,9 @@ No Pages o login é **e-mail + senha** (Supabase Auth). CPF/celular ficam só no
 3. O código deve ser o mesmo passado a `set_bootstrap_secret`
 4. Depois do primeiro admin, o bootstrap fecha (`bootstrap_closed`)
 
-### Administradores adicionais
+### Usuários (admin CRUD)
 
-Após o bootstrap: **Usuários → Novo administrador** (e-mail, nome, senha temporária). O browser chama `signUp` (anon, cliente efêmero) + RPC `create_admin` (somente se `current_app_role() = 'admin'`). Sem `service_role` no Pages. Se o SQL já foi aplicado sem essa função, rode `supabase/create-admin.sql`.
+Após o bootstrap: **Usuários** — listar, criar (e-mail, nome, senha temporária, papel admin|médium), editar (nome, papel, ativo, CPF, celular) e desativar (soft). O browser chama `signUp` (anon, cliente efêmero) + RPCs `create_app_user` / `update_app_user` (somente se `current_app_role() = 'admin'`). Sem `service_role` no Pages. Se o SQL já foi aplicado sem essas funções, rode `supabase/users-crud.sql`.
 
 ## Local (sem Pages)
 
