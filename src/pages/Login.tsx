@@ -40,7 +40,11 @@ export function Login() {
     email_required_pages:
       'Neste host use e-mail (não CPF/celular) + senha do Supabase Auth.',
     email_confirm_required:
-      'Confirme o e-mail no link do Supabase, ou desative “Confirm email” em Authentication → Providers.',
+      'E-mail ainda não confirmado no Auth. Em Authentication → Providers → Email, desative “Confirm email”, ou confirme pelo link e tente de novo.',
+    account_exists_wrong_password:
+      'Esta conta Auth já existe. Use a mesma senha do cadastro anterior, ou apague o usuário em Authentication → Users e tente Criar administrador de novo.',
+    session_required:
+      'Não foi possível abrir sessão Auth. Verifique Confirm email desligado e tente de novo (ou use Entrar se a conta já existir).',
     supabase_unconfigured:
       'Supabase do browser não configurado (faltam VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY).',
   }
