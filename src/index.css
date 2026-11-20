@@ -1,14 +1,14 @@
 @import "tailwindcss";
 
 @theme {
-  --font-serif: "Cormorant Garamond", Georgia, "Times New Roman", serif;
-  --font-sans: "Source Sans 3", "Segoe UI", sans-serif;
+  --font-serif: "Playfair Display", "Cormorant Garamond", Georgia, "Times New Roman", serif;
+  --font-sans: Inter, "Source Sans 3", "Segoe UI", sans-serif;
 
   --color-cream: #faf7f0;
   --color-cream-deep: #f3ede2;
   --color-parchment: #ebe3d4;
-  --color-forest: #1b3a2a;
-  --color-forest-hover: #244a36;
+  --color-forest: #1a3628;
+  --color-forest-hover: #12261c;
   --color-forest-muted: #2d5240;
   --color-gold: #c4a35a;
   --color-gold-soft: #d4bc7a;
@@ -16,7 +16,7 @@
   --color-ink: #2c2418;
   --color-ink-muted: #5c5348;
   --color-ink-faint: #8a7f70;
-  --color-border: #ddd2c0;
+  --color-border: #d6d3c9;
   --color-border-soft: #e8dfd0;
   --color-status-vencida-bg: #f5e0e0;
   --color-status-vencida-fg: #9b3a3a;
