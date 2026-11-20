@@ -40,6 +40,8 @@ export type AuthUser = {
   cpf: string | null
   celular: string | null
   filhoId: string | null
+  /** Present on admin user lists; omitted on session profile. */
+  ativo?: boolean
 }
 
 type AuthContextValue = {
