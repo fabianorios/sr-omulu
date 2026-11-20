@@ -68,3 +68,65 @@ export function rpcErrorCode(error: { message?: string } | null): string {
   if (msg.includes('email')) return 'invalid_credentials'
   return 'auth_failed'
 }
+
+function isEmailNotConfirmed(error: {
+  message?: string
+  code?: string
+} | null): boolean {
+  if (!error) return false
+  if (error.code === 'email_not_confirmed') return true
+  const msg = (error.message ?? '').toLowerCase()
+  return msg.includes('email not confirmed') || msg.includes('confirm your email')
+}
+
+/**
+ * Ensure a browser session for bootstrap.
+ * Supabase often returns signUp "success" with no session when the e-mail
+ * already exists (anti-enumeration) — that is NOT email confirmation.
+ */
+export async function ensureBootstrapSession(
+  sb: SupabaseClient,
+  email: string,
+  password: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { data: signData, error: signError } = await sb.auth.signUp({
+    email,
+    password,
+  })
+  if (signData.session) return { ok: true }
+
+  const { data: inData, error: inErr } = await sb.auth.signInWithPassword({
+    email,
+    password,
+  })
+  if (inData.session) return { ok: true }
+
+  if (isEmailNotConfirmed(inErr) || isEmailNotConfirmed(signError)) {
+    return { ok: false, error: 'email_confirm_required' }
+  }
+
+  // Duplicate signUp: no error, no session, empty identities → must sign in
+  const identities = signData.user?.identities
+  if (
+    !signError &&
+    signData.user &&
+    Array.isArray(identities) &&
+    identities.length === 0
+  ) {
+    return { ok: false, error: 'account_exists_wrong_password' }
+  }
+
+  if (inErr) {
+    const msg = (inErr.message ?? '').toLowerCase()
+    if (msg.includes('invalid') || msg.includes('credentials')) {
+      return { ok: false, error: 'account_exists_wrong_password' }
+    }
+    return { ok: false, error: 'invalid_credentials' }
+  }
+
+  if (signError) {
+    return { ok: false, error: 'bootstrap_failed' }
+  }
+
+  return { ok: false, error: 'session_required' }
+}

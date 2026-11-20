@@ -9,6 +9,7 @@ import {
 } from 'react'
 import { readApiJson } from '../lib/apiJson'
 import {
+  ensureBootstrapSession,
   getSupabaseBrowser,
   mapProfile,
   pagesMissingViteConfig,
@@ -241,24 +242,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return { ok: false, error: 'nome_identificador_senha_min_8' }
         }
 
-        const { data: signData, error: signError } = await sb.auth.signUp({
-          email,
-          password: input.senha,
-        })
-        if (signError) {
-          const msg = signError.message.toLowerCase()
-          if (msg.includes('already') || msg.includes('registered')) {
-            const { error: inErr } = await sb.auth.signInWithPassword({
-              email,
-              password: input.senha,
-            })
-            if (inErr) return { ok: false, error: 'invalid_credentials' }
-          } else {
-            return { ok: false, error: 'bootstrap_failed' }
-          }
-        }
-        if (!signData?.session && !(await sb.auth.getSession()).data.session) {
-          return { ok: false, error: 'email_confirm_required' }
+        const sessionOk = await ensureBootstrapSession(sb, email, input.senha)
+        if (sessionOk.ok === false) {
+          return { ok: false, error: sessionOk.error }
         }
 
         const { data: profile, error: claimError } = await sb.rpc(
