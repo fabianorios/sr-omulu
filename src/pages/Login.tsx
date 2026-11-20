@@ -5,7 +5,8 @@ import { Logo } from '../components/Logo'
 import { MandalaOrixas } from '../components/MandalaOrixas'
 
 export function Login() {
-  const { login, bootstrap, needsBootstrap, loading } = useAuth()
+  const { login, bootstrap, needsBootstrap, loading, browserSupabase } =
+    useAuth()
   const [nome, setNome] = useState('')
   const [identificador, setIdentificador] = useState('')
   const [senha, setSenha] = useState('')
@@ -33,6 +34,16 @@ export function Login() {
         identificador_senha_required: 'Preencha identificador e senha.',
         too_many_attempts:
           'Muitas tentativas. Aguarde alguns minutos e tente de novo.',
+        api_unreachable:
+          'API de login indisponível. Em https://sr-omulu.pages.dev configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no Cloudflare Pages e reaplique o deploy.',
+        server_error:
+          'Servidor indisponível. Confirme schema/RLS e variáveis VITE_* no Pages.',
+        email_required_pages:
+          'Neste host use e-mail (não CPF/celular) + senha do Supabase Auth.',
+        email_confirm_required:
+          'Confirme o e-mail no link do Supabase, ou desative “Confirm email” em Authentication → Providers.',
+        supabase_unconfigured:
+          'Supabase do browser não configurado (faltam VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY).',
       }
       setError(map[result.error ?? ''] ?? 'Não foi possível entrar.')
     }
@@ -94,7 +105,9 @@ export function Login() {
               <p className="mt-2 text-sm text-[#5c5348]">
                 {needsBootstrap
                   ? 'Primeiro acesso: cadastre o administrador da casa.'
-                  : 'Acesso para administração e médiuns da casa.'}
+                  : browserSupabase
+                    ? 'Acesso via e-mail e senha (Supabase Auth).'
+                    : 'Acesso para administração e médiuns da casa.'}
               </p>
             </header>
 
@@ -106,8 +119,12 @@ export function Login() {
                 </h2>
                 <p className="mt-1.5 max-w-xs text-sm text-[#5c5348]">
                   {needsBootstrap
-                    ? 'Informe o código de instalação (BOOTSTRAP_SECRET) e os dados do administrador.'
-                    : 'Use CPF, e-mail ou celular e sua senha.'}
+                    ? browserSupabase
+                      ? 'Informe o código de instalação (mesmo valor de set_bootstrap_secret), e-mail e senha.'
+                      : 'Informe o código de instalação (BOOTSTRAP_SECRET) e os dados do administrador.'
+                    : browserSupabase
+                      ? 'Use o e-mail e a senha cadastrados no Supabase Auth.'
+                      : 'Use CPF, e-mail ou celular e sua senha.'}
                 </p>
               </div>
 
@@ -145,7 +162,9 @@ export function Login() {
                 ) : null}
 
                 <label className="block">
-                  <span className={labelClass}>CPF, e-mail ou celular</span>
+                  <span className={labelClass}>
+                    {browserSupabase ? 'E-mail' : 'CPF, e-mail ou celular'}
+                  </span>
                   <div className="relative">
                     <UserRound
                       size={16}
@@ -154,9 +173,14 @@ export function Login() {
                     />
                     <input
                       required
+                      type={browserSupabase ? 'email' : 'text'}
                       value={identificador}
                       onChange={(e) => setIdentificador(e.target.value)}
-                      placeholder="email@casa.org · 000.000.000-00 · (11) 90000-0000"
+                      placeholder={
+                        browserSupabase
+                          ? 'email@casa.org'
+                          : 'email@casa.org · 000.000.000-00 · (11) 90000-0000'
+                      }
                       className={`${fieldClass} pl-9`}
                       autoComplete="username"
                     />

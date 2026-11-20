@@ -8,6 +8,8 @@ import type { EntidadeLinha, Filho, FilhoInput } from '../types'
 import { emptyEndereco } from '../types'
 import { parseDbSource, type RemoteDbSource } from './dbSource'
 import { normalizeEntidades, sanitizeEntidadesForSave } from './entidades'
+import { supabaseBrowserConfigured } from './supabaseBrowser'
+import { sbCreateFilho, sbLoadFilhos, sbUpdateFilho } from './supabaseData'
 
 /** Shape returned by /api/filhos (snake_case from Postgres). */
 export type FilhoRow = {
@@ -118,6 +120,16 @@ export type LoadFilhosResult =
 
 export async function loadFilhosFromApi(): Promise<LoadFilhosResult> {
   clearLocalFilhosCache()
+  if (supabaseBrowserConfigured()) {
+    const remote = await sbLoadFilhos()
+    if (remote.ok === false) {
+      return { source: 'error', filhos: [], error: remote.error }
+    }
+    return {
+      source: 'supabase',
+      filhos: remote.rows.map(rowToFilho),
+    }
+  }
   try {
     const res = await fetch('/api/filhos', { credentials: 'same-origin' })
     if (res.status === 401) {
@@ -145,6 +157,11 @@ export async function createFilhoViaApi(
   | { ok: true; filho: Filho; source: RemoteDbSource }
   | { ok: false; error: string }
 > {
+  if (supabaseBrowserConfigured()) {
+    const remote = await sbCreateFilho(filho)
+    if (remote.ok === false) return { ok: false, error: remote.error }
+    return { ok: true, filho: rowToFilho(remote.row), source: 'supabase' }
+  }
   try {
     const res = await fetch('/api/filhos', {
       method: 'POST',
@@ -177,6 +194,11 @@ export async function updateFilhoViaApi(
   | { ok: true; filho: Filho; source: RemoteDbSource }
   | { ok: false; error: string }
 > {
+  if (supabaseBrowserConfigured()) {
+    const remote = await sbUpdateFilho(id, filho)
+    if (remote.ok === false) return { ok: false, error: remote.error }
+    return { ok: true, filho: rowToFilho(remote.row), source: 'supabase' }
+  }
   try {
     const res = await fetch(`/api/filhos/${encodeURIComponent(id)}`, {
       method: 'PATCH',

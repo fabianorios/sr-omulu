@@ -1,5 +1,7 @@
 -- Senhor Omulu — apply once in Supabase SQL Editor (Project → SQL → New query).
--- Keep in sync with migrations/001–005. Server uses SUPABASE_SERVICE_ROLE_KEY (bypasses RLS).
+-- Keep in sync with migrations/001–005.
+-- For Cloudflare Pages (browser anon + Auth), also apply supabase/pages-client.sql after this file.
+-- Optional server path uses SUPABASE_SERVICE_ROLE_KEY (bypasses RLS) via app_sql.
 
 create extension if not exists "pgcrypto";
 
@@ -117,8 +119,9 @@ alter table public.obrigacoes enable row level security;
 alter table public.usuarios enable row level security;
 alter table public.sessoes enable row level security;
 
--- No anon/authenticated policies: browser never talks to PostgREST directly.
--- Server uses the service role key (bypasses RLS) via app_sql / supabase-js.
+-- Base file: no anon/authenticated table policies yet.
+-- Browser (Pages) policies + Auth RPCs live in supabase/pages-client.sql.
+-- Optional server uses service_role (bypasses RLS) via app_sql / supabase-js.
 
 -- Parameterized SQL bridge (bound via EXECUTE … USING — no string substitution).
 -- Re-run this function definition if you already applied an older schema.sql.

@@ -2,69 +2,75 @@
 
 Agenda e controle inteligente de obrigações dos médiuns da casa.
 
+## URL pública (única)
+
+**https://sr-omulu.pages.dev** — Cloudflare Pages (SPA estática + Supabase no browser).
+
+Login e Agenda usam o cliente Supabase (`VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY`). Domínio custom e outros hosts ficam fora de escopo até o DNS existir.
+
 ## Stack
 
 - Vite + React 19 + TypeScript
 - Tailwind CSS v4
 - Lucide + date-fns + React Router
-- **Supabase** (preferred when `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` are set)
-- Cursor Postgres fallback (`cursor-app.json` → `DATABASE_URL`) or local **PGlite**
+- **Supabase** no browser (Auth + PostgREST + RLS) quando `VITE_SUPABASE_*` estão definidos
+- Local: `/api/*` via Vite plugin + PGlite (ou `SUPABASE_SERVICE_ROLE_KEY` no server) quando `VITE_*` não estão setados
 - ViaCEP (busca de endereço)
 
 ## Scripts
 
 ```bash
 npm install
-npm run dev      # http://127.0.0.1:5173 (PGlite unless Supabase env is set)
-npm run build   # vite build + migrate when DATABASE_URL is set
+npm run dev      # http://127.0.0.1:5173 — sem VITE_* usa /api + PGlite
+npm run build   # vite build (+ migrate no-op sem DATABASE_URL)
 npm run preview
 ```
 
-## Database
+## Cloudflare Pages
 
-Priority at runtime:
+1. Build command: `npm run build`
+2. Output directory: `dist`
+3. **Build variables** (Settings → Environment variables):
 
-1. **Supabase** — `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (optional `SUPABASE_ANON_KEY` for future client use)
-2. **Postgres** — `DATABASE_URL` (Cursor platform DB)
-3. **PGlite** — in-memory local when neither is set
+| Name | Value |
+|------|--------|
+| `VITE_SUPABASE_URL` | `https://nwvzgtaaezgxmaizzuyw.supabase.co` |
+| `VITE_SUPABASE_ANON_KEY` | Project Settings → API → `anon` `public` |
 
-### Apply schema on Supabase
+Nunca coloque `service_role` em variável `VITE_*` (vai para o bundle).
 
-1. Open the project SQL Editor: https://nwvzgtaaezgxmaizzuyw.supabase.co (Project → SQL → New query)
-2. Paste and run the full contents of `supabase/schema.sql` (creates tables, RLS, and `app_sql` RPC used by the server)
-3. Confirm in Table Editor that `filhos`, `cobrancas`, `obrigacoes`, `usuarios`, `sessoes` exist
+4. Redeploy após salvar as variáveis (build precisa reiniciar para embutir `VITE_*`).
+5. `public/_redirects` faz fallback SPA (`/* → /index.html`).
 
-Do not commit or paste secret keys or `DATABASE_URL`.
+## Database / schema
 
-Migrations `001`–`005` mirror the same schema for PGlite / Cursor Postgres builds.
+1. SQL Editor: rode `supabase/schema.sql` (tabelas + `app_sql` service_role).
+2. Depois rode **`supabase/pages-client.sql`** (Auth link, RLS, `needs_bootstrap` / `claim_bootstrap` / `my_profile`).
+3. Defina o código de instalação (uma vez):
 
-## Cadastro de filhos
+```sql
+select public.set_bootstrap_secret('<BOOTSTRAP_SECRET>');
+```
 
-Pai/mãe de cabeça (listas fixas A–Z). Entidades: linhas Entidade (select A–Z) + Nome (texto livre); o mesmo tipo pode repetir com nomes diferentes. Nascimento, entrada no terreiro, iniciação, até 2 telefones, endereço + CEP (ViaCEP).
+4. Authentication → Providers → Email: para o primeiro acesso, desative **Confirm email** (ou confirme o link).
+5. Authentication → URL configuration: Site URL = `https://sr-omulu.pages.dev`.
 
-## Agenda financeira
-
-Cobranças por filho: **Mensalidade** (valor fixo + dia do mês 1–28 → vencimento do ciclo) e contribuições extensíveis (festivas, obrigações, tipos custom). Status pago / em aberto / vencido. Dashboard: mensalidades vencidas + filhos em débito.
-
-## Obrigações — itens
-
-Ao agendar/editar tipos, liste **itens** e **quantidade**. Persistidos em `obrigacoes.itens` (jsonb) e exibidos no histórico.
-
-## Autenticação e papéis (modelo público + login in-app)
-
-O app pode ser publicado como **público**. A proteção é o **login in-app** (CPF, e-mail ou celular + senha) com cookie HttpOnly `sr_omulu_sess`.
+## Autenticação (Pages)
 
 | Papel | Acesso |
 |-------|--------|
 | **Administrador** | CRUD filhos, financeiro, obrigações, config, usuários |
-| **Médium** | Somente o próprio filho vinculado (`usuarios.filho_id`) |
+| **Médium** | Somente o próprio filho (`usuarios.filho_id`) |
 
-APIs exigem sessão de app. Médiuns não listam tabelas inteiras — filtro por `filho_id`.
+No Pages o login é **e-mail + senha** (Supabase Auth). CPF/celular ficam só no modo local `/api`.
 
 ### Bootstrap do primeiro admin
 
-Exige **`BOOTSTRAP_SECRET`**. Sem o segredo → `503`. Depois que qualquer admin existir → `403 bootstrap_closed`.
+1. Abra https://sr-omulu.pages.dev
+2. Se não houver admin, o formulário pede código de instalação + nome + e-mail + senha
+3. O código deve ser o mesmo passado a `set_bootstrap_secret`
+4. Depois do primeiro admin, o bootstrap fecha (`bootstrap_closed`)
 
-## Publicação
+## Local (sem Pages)
 
-Configure secrets no host (`SUPABASE_*`, `BOOTSTRAP_SECRET`) e aplique `supabase/schema.sql` **antes** de republicar para Supabase. Auth/ownership already on `main` stays unchanged.
+Sem `VITE_*`, `npm run dev` usa as rotas `/api/*` (PGlite ou server Supabase com `SUPABASE_SERVICE_ROLE_KEY` + `BOOTSTRAP_SECRET`). Ver `.env.example`.

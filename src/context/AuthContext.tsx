@@ -7,6 +7,13 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { readApiJson } from '../lib/apiJson'
+import {
+  getSupabaseBrowser,
+  mapProfile,
+  rpcErrorCode,
+  supabaseBrowserConfigured,
+} from '../lib/supabaseBrowser'
 
 export type AppRole = 'admin' | 'medium'
 
@@ -25,6 +32,8 @@ type AuthContextValue = {
   loading: boolean
   needsBootstrap: boolean
   isAdmin: boolean
+  /** True when VITE_SUPABASE_* are set (Cloudflare Pages / browser Supabase). */
+  browserSupabase: boolean
   login: (
     identificador: string,
     senha: string,
@@ -41,56 +50,147 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
+function clearLocalPii() {
+  try {
+    for (const key of [
+      'sr-omulu.filhos.v3',
+      'sr-omulu.filhos.v2',
+      'sr-omulu.filhos.v1',
+      'sr-omulu.cobrancas.v1',
+      'sr-omulu.cobrancas.v0',
+    ]) {
+      localStorage.removeItem(key)
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const browserSupabase = supabaseBrowserConfigured()
   const [user, setUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
   const [needsBootstrap, setNeedsBootstrap] = useState(false)
 
+  const refreshBrowser = useCallback(async () => {
+    const sb = getSupabaseBrowser()
+    if (!sb) {
+      setUser(null)
+      setNeedsBootstrap(false)
+      return
+    }
+    const { data: needs } = await sb.rpc('needs_bootstrap')
+    setNeedsBootstrap(Boolean(needs))
+
+    const { data: sessionData } = await sb.auth.getSession()
+    if (!sessionData.session) {
+      setUser(null)
+      return
+    }
+    const { data: profile, error } = await sb.rpc('my_profile')
+    if (error || !profile) {
+      setUser(null)
+      return
+    }
+    const mapped = mapProfile(profile)
+    setUser(mapped)
+    if (mapped) setNeedsBootstrap(false)
+  }, [])
+
+  const refreshApi = useCallback(async () => {
+    const res = await fetch('/api/auth/me', { credentials: 'same-origin' })
+    const parsed = await readApiJson<{
+      authenticated?: boolean
+      needsBootstrap?: boolean
+      user?: AuthUser
+      error?: string
+    }>(res)
+    if (parsed.ok === false) {
+      setUser(null)
+      setNeedsBootstrap(false)
+      return
+    }
+    const data = parsed.data
+    setNeedsBootstrap(Boolean(data.needsBootstrap))
+    if (data.authenticated && data.user) {
+      setUser(data.user)
+    } else {
+      setUser(null)
+    }
+  }, [])
+
   const refresh = useCallback(async () => {
     try {
-      const res = await fetch('/api/auth/me', { credentials: 'same-origin' })
-      const data = (await res.json()) as {
-        authenticated?: boolean
-        needsBootstrap?: boolean
-        user?: AuthUser
-      }
-      setNeedsBootstrap(Boolean(data.needsBootstrap))
-      if (data.authenticated && data.user) {
-        setUser(data.user)
-      } else {
-        setUser(null)
-      }
+      if (browserSupabase) await refreshBrowser()
+      else await refreshApi()
     } catch {
       setUser(null)
+      setNeedsBootstrap(false)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [browserSupabase, refreshApi, refreshBrowser])
 
   useEffect(() => {
     void refresh()
   }, [refresh])
 
+  useEffect(() => {
+    if (!browserSupabase) return
+    const sb = getSupabaseBrowser()
+    if (!sb) return
+    const { data: sub } = sb.auth.onAuthStateChange(() => {
+      void refreshBrowser().finally(() => setLoading(false))
+    })
+    return () => sub.subscription.unsubscribe()
+  }, [browserSupabase, refreshBrowser])
+
   const login = useCallback(
     async (identificador: string, senha: string) => {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ identificador, senha }),
-      })
-      const data = (await res.json()) as {
-        user?: AuthUser
-        error?: string
+      if (browserSupabase) {
+        const sb = getSupabaseBrowser()
+        if (!sb) return { ok: false, error: 'supabase_unconfigured' }
+        const email = identificador.trim()
+        if (!email.includes('@')) {
+          return { ok: false, error: 'email_required_pages' }
+        }
+        const { error } = await sb.auth.signInWithPassword({
+          email,
+          password: senha,
+        })
+        if (error) {
+          return { ok: false, error: 'invalid_credentials' }
+        }
+        await refreshBrowser()
+        return { ok: true }
       }
-      if (!res.ok || !data.user) {
-        return { ok: false, error: data.error ?? 'login_failed' }
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ identificador, senha }),
+        })
+        const parsed = await readApiJson<{
+          user?: AuthUser
+          error?: string
+        }>(res)
+        if (parsed.ok === false) {
+          return { ok: false, error: parsed.error }
+        }
+        const data = parsed.data
+        if (!res.ok || !data.user) {
+          return { ok: false, error: data.error ?? 'login_failed' }
+        }
+        setUser(data.user)
+        setNeedsBootstrap(false)
+        return { ok: true }
+      } catch {
+        return { ok: false, error: 'api_unreachable' }
       }
-      setUser(data.user)
-      setNeedsBootstrap(false)
-      return { ok: true }
     },
-    [],
+    [browserSupabase, refreshBrowser],
   )
 
   const bootstrap = useCallback(
@@ -100,49 +200,101 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       senha: string
       bootstrapSecret: string
     }) => {
-      const res = await fetch('/api/auth/bootstrap', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          nome: input.nome,
-          identificador: input.identificador,
-          senha: input.senha,
-          bootstrapSecret: input.bootstrapSecret,
-        }),
-      })
-      const data = (await res.json()) as { user?: AuthUser; error?: string }
-      if (!res.ok || !data.user) {
-        return { ok: false, error: data.error ?? 'bootstrap_failed' }
+      if (browserSupabase) {
+        const sb = getSupabaseBrowser()
+        if (!sb) return { ok: false, error: 'supabase_unconfigured' }
+        const email = input.identificador.trim()
+        if (!email.includes('@')) {
+          return { ok: false, error: 'email_required_pages' }
+        }
+        if (input.senha.length < 8 || !input.nome.trim()) {
+          return { ok: false, error: 'nome_identificador_senha_min_8' }
+        }
+
+        const { data: signData, error: signError } = await sb.auth.signUp({
+          email,
+          password: input.senha,
+        })
+        if (signError) {
+          const msg = signError.message.toLowerCase()
+          if (msg.includes('already') || msg.includes('registered')) {
+            const { error: inErr } = await sb.auth.signInWithPassword({
+              email,
+              password: input.senha,
+            })
+            if (inErr) return { ok: false, error: 'invalid_credentials' }
+          } else {
+            return { ok: false, error: 'bootstrap_failed' }
+          }
+        }
+        if (!signData?.session && !(await sb.auth.getSession()).data.session) {
+          return { ok: false, error: 'email_confirm_required' }
+        }
+
+        const { data: profile, error: claimError } = await sb.rpc(
+          'claim_bootstrap',
+          {
+            install_code: input.bootstrapSecret,
+            p_nome: input.nome.trim(),
+          },
+        )
+        if (claimError) {
+          return { ok: false, error: rpcErrorCode(claimError) }
+        }
+        const mapped = mapProfile(profile)
+        if (!mapped) return { ok: false, error: 'bootstrap_failed' }
+        setUser(mapped)
+        setNeedsBootstrap(false)
+        return { ok: true }
       }
-      setUser(data.user)
-      setNeedsBootstrap(false)
-      return { ok: true }
+
+      try {
+        const res = await fetch('/api/auth/bootstrap', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            nome: input.nome,
+            identificador: input.identificador,
+            senha: input.senha,
+            bootstrapSecret: input.bootstrapSecret,
+          }),
+        })
+        const parsed = await readApiJson<{
+          user?: AuthUser
+          error?: string
+        }>(res)
+        if (parsed.ok === false) {
+          return { ok: false, error: parsed.error }
+        }
+        const data = parsed.data
+        if (!res.ok || !data.user) {
+          return { ok: false, error: data.error ?? 'bootstrap_failed' }
+        }
+        setUser(data.user)
+        setNeedsBootstrap(false)
+        return { ok: true }
+      } catch {
+        return { ok: false, error: 'api_unreachable' }
+      }
     },
-    [],
+    [browserSupabase],
   )
 
   const logout = useCallback(async () => {
-    await fetch('/api/auth/logout', {
-      method: 'POST',
-      credentials: 'same-origin',
-    })
-    try {
-      for (const key of [
-        'sr-omulu.filhos.v3',
-        'sr-omulu.filhos.v2',
-        'sr-omulu.filhos.v1',
-        'sr-omulu.cobrancas.v1',
-        'sr-omulu.cobrancas.v0',
-      ]) {
-        localStorage.removeItem(key)
-      }
-    } catch {
-      /* ignore */
+    if (browserSupabase) {
+      const sb = getSupabaseBrowser()
+      await sb?.auth.signOut()
+    } else {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'same-origin',
+      })
     }
+    clearLocalPii()
     setUser(null)
     await refresh()
-  }, [refresh])
+  }, [browserSupabase, refresh])
 
   const value = useMemo(
     () => ({
@@ -150,12 +302,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       needsBootstrap,
       isAdmin: user?.role === 'admin',
+      browserSupabase,
       login,
       bootstrap,
       logout,
       refresh,
     }),
-    [user, loading, needsBootstrap, login, bootstrap, logout, refresh],
+    [
+      user,
+      loading,
+      needsBootstrap,
+      browserSupabase,
+      login,
+      bootstrap,
+      logout,
+      refresh,
+    ],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
