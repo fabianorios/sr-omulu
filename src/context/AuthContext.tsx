@@ -11,23 +11,9 @@ import { readApiJson } from '../lib/apiJson'
 import {
   getSupabaseBrowser,
   mapProfile,
-  pagesMissingViteConfig,
   rpcErrorCode,
   supabaseBrowserConfigured,
 } from '../lib/supabaseBrowser'
-
-const FETCH_MS = 10_000
-
-function fetchWithTimeout(
-  input: RequestInfo | URL,
-  init: RequestInit = {},
-): Promise<Response> {
-  const ctrl = new AbortController()
-  const t = setTimeout(() => ctrl.abort(), FETCH_MS)
-  return fetch(input, { ...init, signal: ctrl.signal }).finally(() =>
-    clearTimeout(t),
-  )
-}
 
 export type AppRole = 'admin' | 'medium'
 
@@ -48,8 +34,6 @@ type AuthContextValue = {
   isAdmin: boolean
   /** True when VITE_SUPABASE_* are set (Cloudflare Pages / browser Supabase). */
   browserSupabase: boolean
-  /** Production Pages build missing VITE_* — show setup banner, do not hit /api. */
-  pagesMissingVite: boolean
   login: (
     identificador: string,
     senha: string,
@@ -84,7 +68,6 @@ function clearLocalPii() {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const browserSupabase = supabaseBrowserConfigured()
-  const pagesMissingVite = pagesMissingViteConfig()
   const [user, setUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
   const [needsBootstrap, setNeedsBootstrap] = useState(false)
@@ -115,9 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const refreshApi = useCallback(async () => {
-    const res = await fetchWithTimeout('/api/auth/me', {
-      credentials: 'same-origin',
-    })
+    const res = await fetch('/api/auth/me', { credentials: 'same-origin' })
     const parsed = await readApiJson<{
       authenticated?: boolean
       needsBootstrap?: boolean
@@ -140,11 +121,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     try {
-      if (pagesMissingVite) {
-        setUser(null)
-        setNeedsBootstrap(false)
-        return
-      }
       if (browserSupabase) await refreshBrowser()
       else await refreshApi()
     } catch {
@@ -153,7 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false)
     }
-  }, [browserSupabase, pagesMissingVite, refreshApi, refreshBrowser])
+  }, [browserSupabase, refreshApi, refreshBrowser])
 
   useEffect(() => {
     void refresh()
@@ -171,9 +147,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (identificador: string, senha: string) => {
-      if (pagesMissingVite) {
-        return { ok: false, error: 'pages_missing_vite' }
-      }
       if (browserSupabase) {
         const sb = getSupabaseBrowser()
         if (!sb) return { ok: false, error: 'supabase_unconfigured' }
@@ -193,7 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        const res = await fetchWithTimeout('/api/auth/login', {
+        const res = await fetch('/api/auth/login', {
           method: 'POST',
           credentials: 'same-origin',
           headers: { 'content-type': 'application/json' },
@@ -217,7 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { ok: false, error: 'api_unreachable' }
       }
     },
-    [browserSupabase, pagesMissingVite, refreshBrowser],
+    [browserSupabase, refreshBrowser],
   )
 
   const bootstrap = useCallback(
@@ -227,9 +200,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       senha: string
       bootstrapSecret: string
     }) => {
-      if (pagesMissingVite) {
-        return { ok: false, error: 'pages_missing_vite' }
-      }
       if (browserSupabase) {
         const sb = getSupabaseBrowser()
         if (!sb) return { ok: false, error: 'supabase_unconfigured' }
@@ -279,7 +249,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        const res = await fetchWithTimeout('/api/auth/bootstrap', {
+        const res = await fetch('/api/auth/bootstrap', {
           method: 'POST',
           credentials: 'same-origin',
           headers: { 'content-type': 'application/json' },
@@ -308,27 +278,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { ok: false, error: 'api_unreachable' }
       }
     },
-    [browserSupabase, pagesMissingVite],
+    [browserSupabase],
   )
 
   const logout = useCallback(async () => {
     if (browserSupabase) {
       const sb = getSupabaseBrowser()
       await sb?.auth.signOut()
-    } else if (!pagesMissingVite) {
-      try {
-        await fetchWithTimeout('/api/auth/logout', {
-          method: 'POST',
-          credentials: 'same-origin',
-        })
-      } catch {
-        /* ignore */
-      }
+    } else {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'same-origin',
+      })
     }
     clearLocalPii()
     setUser(null)
     await refresh()
-  }, [browserSupabase, pagesMissingVite, refresh])
+  }, [browserSupabase, refresh])
 
   const value = useMemo(
     () => ({
@@ -337,7 +303,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       needsBootstrap,
       isAdmin: user?.role === 'admin',
       browserSupabase,
-      pagesMissingVite,
       login,
       bootstrap,
       logout,
@@ -348,7 +313,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       needsBootstrap,
       browserSupabase,
-      pagesMissingVite,
       login,
       bootstrap,
       logout,
