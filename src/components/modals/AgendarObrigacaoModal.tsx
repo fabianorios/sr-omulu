@@ -7,7 +7,10 @@ import { calculateNextDate, formatBR } from '../../utils/status'
 
 export function AgendarObrigacaoModal({ onClose }: { onClose: () => void }) {
   const { state, addObrigacao } = useApp()
-  const activeTipos = state.tipos.filter((t) => t.active)
+  // Tipos ciclicos / pontuais com cálculo; "manual" usa o fluxo Nova obrigação.
+  const activeTipos = state.tipos.filter(
+    (t) => t.active && t.id !== 'manual',
+  )
 
   const [filhoId, setFilhoId] = useState(state.filhos[0]?.id ?? '')
   const [tipoId, setTipoId] = useState<ObligationTypeId>(

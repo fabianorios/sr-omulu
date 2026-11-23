@@ -9,6 +9,8 @@ export type ObligationTypeId =
   | 'feitura'
   | 'troca_guia'
   | 'festiva'
+  /** Criação manual (sem cálculo automático de ciclo). */
+  | 'manual'
 
 export interface ObligationType {
   id: ObligationTypeId
@@ -58,6 +60,8 @@ export type FilhoInput = Omit<Filho, 'id'> & { id?: string }
 export interface ObrigacaoItem {
   nome: string
   quantidade: number
+  /** Observação opcional por item (ex.: cor, tamanho). */
+  observacao?: string
 }
 
 export interface Obrigacao {
@@ -67,6 +71,11 @@ export interface Obrigacao {
   data: string
   ultimaData?: string
   itens: ObrigacaoItem[]
+  /** Título livre — obrigações manuais (`tipoId: 'manual'`). */
+  nome?: string
+  observacoes?: string
+  /** Lote de replicação aos filhos (idempotência por filho+lote). */
+  loteId?: string
 }
 
 export type CobrancaCategoria = 'mensalidade' | 'contribuicao' | 'outro'
@@ -127,12 +136,24 @@ export interface AppState {
 }
 
 export function emptyObrigacaoItem(): ObrigacaoItem {
-  return { nome: '', quantidade: 1 }
+  return { nome: '', quantidade: 1, observacao: '' }
 }
 
 export function formatObrigacaoItem(item: ObrigacaoItem): string {
   const q = Number.isFinite(item.quantidade) ? item.quantidade : 0
-  return `${item.nome.trim() || 'Item'} × ${q}`
+  const base = `${item.nome.trim() || 'Item'} × ${q}`
+  const obs = item.observacao?.trim()
+  return obs ? `${base} (${obs})` : base
+}
+
+/** Rótulo de exibição: nome manual ou nome do tipo cadastrado. */
+export function obrigacaoLabel(
+  o: Pick<Obrigacao, 'nome' | 'tipoId'>,
+  tipoName?: string,
+): string {
+  const nome = o.nome?.trim()
+  if (nome) return nome
+  return tipoName?.trim() || o.tipoId
 }
 
 export function emptyEndereco(): Endereco {

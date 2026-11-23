@@ -20,6 +20,7 @@ import {
   getFinanceStatus,
   filhosDevedores,
 } from '../lib/finance'
+import { obrigacaoLabel } from '../types'
 import {
   buildAlerts,
   countDueThisMonth,
@@ -247,7 +248,8 @@ export function Dashboard() {
                 </p>
                 <p className="mt-0.5 truncate text-sm text-[var(--color-ink-muted)]">
                   Pai {filho.paiDeCabeca} · Mãe {filho.maeDeCabeca} ·{' '}
-                  {tipo.name} · {formatBR(obrigacao.data)}
+                  {obrigacaoLabel(obrigacao, tipo.name)} ·{' '}
+                  {formatBR(obrigacao.data)}
                   {obrigacao.itens?.length
                     ? ` · ${obrigacao.itens.map((i) => `${i.nome}×${i.quantidade}`).join(', ')}`
                     : ''}

@@ -14,9 +14,12 @@ export type ObrigacaoRow = {
   data: string
   ultima_data: string | null
   itens: unknown
+  nome?: string | null
+  observacoes?: string | null
+  lote_id?: string | null
 }
 
-function normalizeItens(raw: unknown): ObrigacaoItem[] {
+export function normalizeItens(raw: unknown): ObrigacaoItem[] {
   if (!Array.isArray(raw)) return []
   const out: ObrigacaoItem[] = []
   for (const item of raw) {
@@ -25,15 +28,34 @@ function normalizeItens(raw: unknown): ObrigacaoItem[] {
     const nome = String(rec.nome ?? '').trim()
     const quantidade = Number(rec.quantidade)
     if (!nome) continue
+    const observacao = String(rec.observacao ?? '').trim()
     out.push({
       nome,
       quantidade: Number.isFinite(quantidade) && quantidade > 0 ? quantidade : 1,
+      ...(observacao ? { observacao } : {}),
     })
   }
   return out
 }
 
+export function cleanItens(itens: ObrigacaoItem[] | undefined): ObrigacaoItem[] {
+  return (itens ?? [])
+    .map((i) => {
+      const observacao = i.observacao?.trim()
+      return {
+        nome: i.nome.trim(),
+        quantidade: Number(i.quantidade) > 0 ? Number(i.quantidade) : 1,
+        ...(observacao ? { observacao } : {}),
+      }
+    })
+    .filter((i) => i.nome)
+}
+
 export function rowToObrigacao(row: ObrigacaoRow): Obrigacao {
+  const nome = row.nome != null ? String(row.nome).trim() : ''
+  const observacoes =
+    row.observacoes != null ? String(row.observacoes).trim() : ''
+  const loteId = row.lote_id != null ? String(row.lote_id).trim() : ''
   return {
     id: row.id,
     filhoId: row.filho_id,
@@ -43,6 +65,9 @@ export function rowToObrigacao(row: ObrigacaoRow): Obrigacao {
       ? String(row.ultima_data).slice(0, 10)
       : undefined,
     itens: normalizeItens(row.itens),
+    ...(nome ? { nome } : {}),
+    ...(observacoes ? { observacoes } : {}),
+    ...(loteId ? { loteId } : {}),
   }
 }
 
@@ -52,12 +77,10 @@ export function obrigacaoToPayload(o: Omit<Obrigacao, 'id'> & { id?: string }) {
     tipoId: o.tipoId,
     data: o.data,
     ultimaData: o.ultimaData,
-    itens: (o.itens ?? [])
-      .map((i) => ({
-        nome: i.nome.trim(),
-        quantidade: Number(i.quantidade) > 0 ? Number(i.quantidade) : 1,
-      }))
-      .filter((i) => i.nome),
+    itens: cleanItens(o.itens),
+    nome: o.nome?.trim() || undefined,
+    observacoes: o.observacoes?.trim() || undefined,
+    loteId: o.loteId?.trim() || undefined,
   }
 }
 
@@ -158,7 +181,10 @@ export async function updateObrigacaoViaApi(
     if (patch.tipoId != null) body.tipoId = patch.tipoId
     if (patch.data != null) body.data = patch.data
     if ('ultimaData' in patch) body.ultimaData = patch.ultimaData
-    if (patch.itens != null) body.itens = patch.itens
+    if (patch.itens != null) body.itens = cleanItens(patch.itens)
+    if ('nome' in patch) body.nome = patch.nome
+    if ('observacoes' in patch) body.observacoes = patch.observacoes
+    if ('loteId' in patch) body.loteId = patch.loteId
     const res = await fetch(`/api/obrigacoes/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       credentials: 'same-origin',

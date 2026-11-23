@@ -107,10 +107,22 @@ export async function sbCreateObrigacao(
       data: o.data,
       ultima_data: o.ultimaData ?? null,
       itens: o.itens ?? [],
+      nome: o.nome?.trim() || null,
+      observacoes: o.observacoes?.trim() || null,
+      lote_id: o.loteId?.trim() || null,
     })
     .select('*')
     .single()
-  if (error || !data) return { ok: false, error: error?.message ?? 'create_failed' }
+  if (error || !data) {
+    const msg = error?.message ?? 'create_failed'
+    if (
+      error?.code === '23505' ||
+      /duplicate|unique|filho_lote/i.test(msg)
+    ) {
+      return { ok: false, error: 'already_exists' }
+    }
+    return { ok: false, error: msg }
+  }
   return { ok: true, row: data as ObrigacaoRow }
 }
 
@@ -126,6 +138,9 @@ export async function sbUpdateObrigacao(
   if (patch.data != null) body.data = patch.data
   if ('ultimaData' in patch) body.ultima_data = patch.ultimaData ?? null
   if (patch.itens != null) body.itens = patch.itens
+  if ('nome' in patch) body.nome = patch.nome?.trim() || null
+  if ('observacoes' in patch) body.observacoes = patch.observacoes?.trim() || null
+  if ('loteId' in patch) body.lote_id = patch.loteId?.trim() || null
   const { data, error } = await sb
     .from('obrigacoes')
     .update(body)

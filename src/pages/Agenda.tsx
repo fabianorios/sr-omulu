@@ -11,17 +11,20 @@ import {
   startOfWeek,
 } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { CalendarPlus, ChevronLeft, ChevronRight } from 'lucide-react'
 import { PAIS_DE_CABECA, type PaiDeCabeca } from '../data/catalog'
 import { REFERENCE_DATE } from '../data/mock'
 import { useApp } from '../context/AppContext'
+import { useAuth } from '../context/AuthContext'
 import type { ObligationTypeId } from '../types'
+import { obrigacaoLabel } from '../types'
 import { formatBR, formatLongDay, parseDate } from '../utils/status'
 
 const WEEKDAYS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB']
 
 export function Agenda() {
-  const { state } = useApp()
+  const { state, setOpenNovaObrigacao } = useApp()
+  const { isAdmin } = useAuth()
   const [month, setMonth] = useState(() => startOfMonth(REFERENCE_DATE))
   const [selected, setSelected] = useState(() => REFERENCE_DATE)
   const [filterPai, setFilterPai] = useState<PaiDeCabeca | 'Todos'>('Todos')
@@ -60,13 +63,11 @@ export function Agenda() {
     for (const o of filteredObrigacoes) {
       if (isSameDay(parseDate(o.data), day)) {
         const tipo = tipoMap.get(o.tipoId)
-        if (tipo) {
-          dots.push({
-            key: o.id,
-            color: tipo.color,
-            label: tipo.name,
-          })
-        }
+        dots.push({
+          key: o.id,
+          color: tipo?.color ?? '#6B5B4A',
+          label: obrigacaoLabel(o, tipo?.name),
+        })
       }
     }
 
@@ -93,12 +94,17 @@ export function Agenda() {
       if (isSameDay(parseDate(o.data), selected)) {
         const filho = filhoMap.get(o.filhoId)
         const tipo = tipoMap.get(o.tipoId)
-        if (filho && tipo) {
+        if (filho) {
+          const label = obrigacaoLabel(o, tipo?.name)
+          const itensHint =
+            o.itens?.length > 0
+              ? ` · ${o.itens.length} item(ns)`
+              : ''
           items.push({
             id: o.id,
             title: filho.nome,
-            detail: `${tipo.name} · Pai ${filho.paiDeCabeca} · Mãe ${filho.maeDeCabeca}`,
-            color: tipo.color,
+            detail: `${label}${itensHint} · Pai ${filho.paiDeCabeca} · Mãe ${filho.maeDeCabeca}`,
+            color: tipo?.color ?? '#6B5B4A',
           })
         }
       }
@@ -128,16 +134,28 @@ export function Agenda() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <div className="animate-fade-in">
-        <p className="text-xs font-semibold tracking-[0.18em] text-[var(--color-tan)] uppercase">
-          Calendário
-        </p>
-        <h2 className="mt-1 font-serif text-2xl font-semibold text-[var(--color-forest)] sm:text-3xl md:text-4xl">
-          Agenda da Casa
-        </h2>
-        <p className="mt-2 text-sm text-[var(--color-ink-muted)]">
-          Marcadores coloridos por tipo de obrigação e eventos da corrente.
-        </p>
+      <div className="animate-fade-in flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold tracking-[0.18em] text-[var(--color-tan)] uppercase">
+            Calendário
+          </p>
+          <h2 className="mt-1 font-serif text-2xl font-semibold text-[var(--color-forest)] sm:text-3xl md:text-4xl">
+            Agenda da Casa
+          </h2>
+          <p className="mt-2 text-sm text-[var(--color-ink-muted)]">
+            Marcadores coloridos por tipo de obrigação e eventos da corrente.
+          </p>
+        </div>
+        {isAdmin ? (
+          <button
+            type="button"
+            onClick={() => setOpenNovaObrigacao(true)}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-[var(--color-forest)] px-3.5 py-2 text-sm font-semibold text-[var(--color-cream)] hover:bg-[var(--color-forest-hover)]"
+          >
+            <CalendarPlus size={16} />
+            Nova obrigação
+          </button>
+        ) : null}
       </div>
 
       <div className="animate-fade-in-delay-1 flex flex-wrap gap-3">
