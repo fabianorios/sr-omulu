@@ -11,6 +11,7 @@ import {
   sbCreateCobrancaTipo,
   sbLoadCobrancas,
   sbUpdateCobranca,
+  sbUpdateCobrancaTipo,
 } from './supabaseData'
 
 export type CobrancaTipoRow = {
@@ -252,6 +253,47 @@ export async function createCobrancaTipoViaApi(input: {
       credentials: 'same-origin',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(input),
+    })
+    const data = (await res.json()) as {
+      tipo?: CobrancaTipoRow
+      error?: string
+      source?: string
+    }
+    if (!res.ok || !data.tipo) {
+      return { ok: false, error: data.error ?? `http_${res.status}` }
+    }
+    return {
+      ok: true,
+      tipo: rowToCobrancaTipo(data.tipo),
+      source: parseDbSource(data.source),
+    }
+  } catch {
+    return { ok: false, error: 'network' }
+  }
+}
+
+export async function updateCobrancaTipoViaApi(
+  id: string,
+  patch: { nome?: string; categoria?: CobrancaCategoria; ativo?: boolean },
+): Promise<
+  | { ok: true; tipo: CobrancaTipo; source: RemoteDbSource }
+  | { ok: false; error: string }
+> {
+  if (supabaseBrowserConfigured()) {
+    const remote = await sbUpdateCobrancaTipo(id, patch)
+    if (remote.ok === false) return { ok: false, error: remote.error }
+    return {
+      ok: true,
+      tipo: rowToCobrancaTipo(remote.row),
+      source: 'supabase',
+    }
+  }
+  try {
+    const res = await fetch(`/api/cobranca-tipos/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      credentials: 'same-origin',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(patch),
     })
     const data = (await res.json()) as {
       tipo?: CobrancaTipoRow
