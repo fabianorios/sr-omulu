@@ -17,16 +17,18 @@ function idFromUrl(request: Request): string | null {
 
 function parseItens(raw: unknown) {
   if (!Array.isArray(raw)) return null
-  const out: { nome: string; quantidade: number }[] = []
+  const out: { nome: string; quantidade: number; observacao?: string }[] = []
   for (const item of raw) {
     if (!item || typeof item !== 'object') continue
     const rec = item as Record<string, unknown>
     const nome = String(rec.nome ?? '').trim()
     const quantidade = Number(rec.quantidade)
     if (!nome) continue
+    const observacao = String(rec.observacao ?? '').trim()
     out.push({
       nome,
       quantidade: Number.isFinite(quantidade) && quantidade > 0 ? quantidade : 1,
+      ...(observacao ? { observacao } : {}),
     })
   }
   return out
@@ -79,6 +81,27 @@ export async function PATCH(request: Request): Promise<Response> {
   if (itens) {
     params.push(JSON.stringify(itens))
     sets.push(`itens = $${params.length}::jsonb`)
+  }
+  if ('nome' in body) {
+    const raw = body.nome
+    push(
+      'nome',
+      raw == null || String(raw).trim() === '' ? null : String(raw).trim(),
+    )
+  }
+  if ('observacoes' in body) {
+    const raw = body.observacoes
+    push(
+      'observacoes',
+      raw == null || String(raw).trim() === '' ? null : String(raw).trim(),
+    )
+  }
+  if ('loteId' in body || 'lote_id' in body) {
+    const raw = body.loteId ?? body.lote_id
+    push(
+      'lote_id',
+      raw == null || String(raw).trim() === '' ? null : String(raw).trim(),
+    )
   }
 
   if (sets.length === 0) return json({ error: 'empty_patch' }, 400)

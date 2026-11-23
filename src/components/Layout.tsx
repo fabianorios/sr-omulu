@@ -6,6 +6,7 @@ import { Sidebar } from './Sidebar'
 import { NovoFilhoModal } from './modals/NovoFilhoModal'
 import { AgendarObrigacaoModal } from './modals/AgendarObrigacaoModal'
 import { NovaCobrancaModal } from './modals/NovaCobrancaModal'
+import { NovaObrigacaoModal } from './modals/NovaObrigacaoModal'
 
 export function Layout() {
   const {
@@ -13,10 +14,12 @@ export function Layout() {
     editingFilho,
     openAgendar,
     openNovaCobranca,
+    openNovaObrigacao,
     setOpenNovoFilho,
     setEditingFilho,
     setOpenAgendar,
     setOpenNovaCobranca,
+    setOpenNovaObrigacao,
   } = useApp()
   const [menuOpen, setMenuOpen] = useState(false)
   const location = useLocation()
@@ -68,6 +71,9 @@ export function Layout() {
       )}
       {openNovaCobranca && (
         <NovaCobrancaModal onClose={() => setOpenNovaCobranca(false)} />
+      )}
+      {openNovaObrigacao && (
+        <NovaObrigacaoModal onClose={() => setOpenNovaObrigacao(false)} />
       )}
     </div>
   )

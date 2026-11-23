@@ -66,6 +66,19 @@ interface AppContextValue {
     id: string,
     patch: Partial<Obrigacao>,
   ) => Promise<{ ok: boolean; error?: string }>
+  /** Replica obrigação manual aos filhos; pula duplicatas (mesmo nome+data ou mesmo lote). */
+  replicateObrigacao: (input: {
+    nome: string
+    data: string
+    observacoes?: string
+    itens: Obrigacao['itens']
+    filhoIds: string[]
+  }) => Promise<{
+    ok: boolean
+    created: number
+    skipped: number
+    error?: string
+  }>
   toggleTipo: (id: ObligationTypeId) => void
   updateTipo: (id: ObligationTypeId, patch: Partial<ObligationType>) => void
   addCobranca: (
@@ -87,10 +100,12 @@ interface AppContextValue {
   editingFilho: Filho | null
   openAgendar: boolean
   openNovaCobranca: boolean
+  openNovaObrigacao: boolean
   setOpenNovoFilho: (v: boolean) => void
   setEditingFilho: (filho: Filho | null) => void
   setOpenAgendar: (v: boolean) => void
   setOpenNovaCobranca: (v: boolean) => void
+  setOpenNovaObrigacao: (v: boolean) => void
 }
 
 const AppContext = createContext<AppContextValue | null>(null)
@@ -132,6 +147,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [editingFilho, setEditingFilho] = useState<Filho | null>(null)
   const [openAgendar, setOpenAgendar] = useState(false)
   const [openNovaCobranca, setOpenNovaCobranca] = useState(false)
+  const [openNovaObrigacao, setOpenNovaObrigacao] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -397,6 +413,114 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [],
   )
 
+  const replicateObrigacao = useCallback(
+    async (input: {
+      nome: string
+      data: string
+      observacoes?: string
+      itens: Obrigacao['itens']
+      filhoIds: string[]
+    }) => {
+      const nome = input.nome.trim()
+      const data = input.data.trim().slice(0, 10)
+      const filhoIds = [...new Set(input.filhoIds.filter(Boolean))]
+      if (!nome || !data || filhoIds.length === 0) {
+        return {
+          ok: false,
+          created: 0,
+          skipped: 0,
+          error: 'missing_fields',
+        }
+      }
+
+      const loteId =
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : uid('lote')
+
+      const nomeKey = nome.toLowerCase()
+      let created = 0
+      let skipped = 0
+      let lastError: string | undefined
+
+      for (const filhoId of filhoIds) {
+        const already = state.obrigacoes.some((o) => {
+          if (o.filhoId !== filhoId) return false
+          if (o.loteId && o.loteId === loteId) return true
+          const oNome = (o.nome ?? '').trim().toLowerCase()
+          return oNome === nomeKey && o.data === data
+        })
+        if (already) {
+          skipped += 1
+          continue
+        }
+
+        const remote = await createObrigacaoViaApi({
+          filhoId,
+          tipoId: 'manual',
+          data,
+          nome,
+          observacoes: input.observacoes?.trim() || undefined,
+          itens: input.itens ?? [],
+          loteId,
+        })
+
+        if (remote.ok === true) {
+          created += 1
+          setState((prev) => ({
+            ...prev,
+            obrigacoes: [...prev.obrigacoes, remote.obrigacao],
+          }))
+          continue
+        }
+
+        if (remote.error === 'already_exists') {
+          skipped += 1
+          continue
+        }
+
+        if (
+          remote.error === 'network' ||
+          remote.error.startsWith('http_5') ||
+          remote.error.startsWith('http_')
+        ) {
+          created += 1
+          setState((prev) => ({
+            ...prev,
+            obrigacoes: [
+              ...prev.obrigacoes,
+              {
+                id: uid('o'),
+                filhoId,
+                tipoId: 'manual',
+                data,
+                nome,
+                observacoes: input.observacoes?.trim() || undefined,
+                itens: input.itens ?? [],
+                loteId,
+              },
+            ],
+          }))
+          continue
+        }
+
+        lastError = remote.error
+      }
+
+      if (created === 0 && skipped === 0) {
+        return {
+          ok: false,
+          created: 0,
+          skipped: 0,
+          error: lastError ?? 'create_failed',
+        }
+      }
+
+      return { ok: true, created, skipped, error: lastError }
+    },
+    [state.obrigacoes],
+  )
+
   const toggleTipo = useCallback((id: ObligationTypeId) => {
     setState((prev) => ({
       ...prev,
@@ -572,6 +696,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updateFilho,
       addObrigacao,
       updateObrigacao,
+      replicateObrigacao,
       toggleTipo,
       updateTipo,
       addCobranca,
@@ -582,10 +707,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       editingFilho,
       openAgendar,
       openNovaCobranca,
+      openNovaObrigacao,
       setOpenNovoFilho,
       setEditingFilho,
       setOpenAgendar,
       setOpenNovaCobranca,
+      setOpenNovaObrigacao,
     }),
     [
       state,
@@ -595,6 +722,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updateFilho,
       addObrigacao,
       updateObrigacao,
+      replicateObrigacao,
       toggleTipo,
       updateTipo,
       addCobranca,
@@ -605,6 +733,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       editingFilho,
       openAgendar,
       openNovaCobranca,
+      openNovaObrigacao,
     ],
   )
 

@@ -10,18 +10,24 @@ import { dbMode } from '../lib/db'
 
 type ObrigacaoRow = Record<string, unknown>
 
-function parseItens(raw: unknown): { nome: string; quantidade: number }[] {
+function parseItens(raw: unknown): {
+  nome: string
+  quantidade: number
+  observacao?: string
+}[] {
   if (!Array.isArray(raw)) return []
-  const out: { nome: string; quantidade: number }[] = []
+  const out: { nome: string; quantidade: number; observacao?: string }[] = []
   for (const item of raw) {
     if (!item || typeof item !== 'object') continue
     const rec = item as Record<string, unknown>
     const nome = String(rec.nome ?? '').trim()
     const quantidade = Number(rec.quantidade)
     if (!nome) continue
+    const observacao = String(rec.observacao ?? '').trim()
     out.push({
       nome,
       quantidade: Number.isFinite(quantidade) && quantidade > 0 ? quantidade : 1,
+      ...(observacao ? { observacao } : {}),
     })
   }
   return out
@@ -71,20 +77,33 @@ export async function POST(request: Request): Promise<Response> {
 
   const itens = parseItens(body.itens)
   const ultima = emptyToNull(body.ultimaData ?? body.ultima_data)
+  const nome = emptyToNull(body.nome)
+  const observacoes = emptyToNull(body.observacoes)
+  const loteId = emptyToNull(body.loteId ?? body.lote_id)
 
   try {
     const rows = await sql<ObrigacaoRow>(
-      `insert into obrigacoes (filho_id, tipo_id, data, ultima_data, itens)
-       values ($1, $2, $3, $4, $5::jsonb)
+      `insert into obrigacoes (filho_id, tipo_id, data, ultima_data, itens, nome, observacoes, lote_id)
+       values ($1, $2, $3, $4, $5::jsonb, $6, $7, $8)
        returning *`,
-      [filhoId, tipoId, data, ultima, JSON.stringify(itens)],
+      [
+        filhoId,
+        tipoId,
+        data,
+        ultima,
+        JSON.stringify(itens),
+        nome,
+        observacoes,
+        loteId,
+      ],
     )
     return json({ source: dbMode(), obrigacao: rows[0] }, 201)
   } catch (error) {
-    return json(
-      { error: error instanceof Error ? error.message : 'db_error' },
-      500,
-    )
+    const msg = error instanceof Error ? error.message : 'db_error'
+    if (/unique|duplicate|filho_lote/i.test(msg)) {
+      return json({ error: 'already_exists' }, 409)
+    }
+    return json({ error: msg }, 500)
   }
 }
 

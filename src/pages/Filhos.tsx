@@ -9,7 +9,11 @@ import {
   nextObligationForFilho,
 } from '../utils/status'
 import type { Filho } from '../types'
-import { formatEntidade, formatObrigacaoItem } from '../types'
+import {
+  formatEntidade,
+  formatObrigacaoItem,
+  obrigacaoLabel,
+} from '../types'
 
 export function Filhos() {
   const {
@@ -333,10 +337,13 @@ export function Filhos() {
                     >
                       <div className="min-w-0">
                         <p className="font-medium text-[var(--color-ink)]">
-                          {tipo?.name ?? o.tipoId}
+                          {obrigacaoLabel(o, tipo?.name)}
                         </p>
                         <p className="text-xs text-[var(--color-ink-muted)]">
                           {formatBR(o.data)}
+                          {o.observacoes?.trim()
+                            ? ` · ${o.observacoes.trim()}`
+                            : ''}
                         </p>
                         {o.itens?.length ? (
                           <p className="mt-0.5 text-xs text-[var(--color-ink-faint)]">

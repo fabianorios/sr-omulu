@@ -63,8 +63,9 @@ export function Config() {
           Tipos de Obrigações
         </h2>
         <p className="mt-2 text-sm text-[var(--color-ink-muted)]">
-          Gerencie ciclos espirituais (1, 3, 7 anos, festivas) e regras de
-          cálculo automático.
+          Ciclos espirituais (1, 3, 7 anos, festivas) com cálculo automático.
+          Obrigações manuais (sem cálculo) são criadas em Agenda → Nova
+          obrigação.
         </p>
       </div>
 
@@ -156,11 +157,13 @@ export function Config() {
               }
               className="rounded-md border border-[var(--color-border)] bg-white px-3 py-2 text-sm font-normal normal-case text-[var(--color-ink)]"
             >
-              {state.tipos.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
+              {state.tipos
+                .filter((t) => t.id !== 'manual')
+                .map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
             </select>
           </label>
           <label className="flex flex-1 flex-col gap-1 text-xs font-semibold text-[var(--color-ink-muted)] uppercase">

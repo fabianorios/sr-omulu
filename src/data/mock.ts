@@ -74,6 +74,15 @@ export const DEFAULT_TIPOS: ObligationType[] = [
       { nome: 'Flor', quantidade: 3 },
     ],
   },
+  {
+    id: 'manual',
+    name: 'Obrigação manual',
+    description:
+      'Criada pelo admin com data e itens informados manualmente (sem cálculo de ciclo).',
+    yearsOffset: null,
+    color: '#6B5B4A',
+    active: true,
+  },
 ]
 
 export const DEFAULT_COBRANCA_TIPOS: CobrancaTipo[] = [
