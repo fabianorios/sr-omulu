@@ -20,6 +20,7 @@ import {
   loadCobrancasFromApi,
   loadLocalCobrancas,
   saveLocalCobrancas,
+  updateCobrancaTipoViaApi,
   updateCobrancaViaApi,
 } from '../lib/cobrancasApi'
 import {
@@ -78,6 +79,10 @@ interface AppContextValue {
     nome: string
     categoria: CobrancaCategoria
   }) => Promise<{ ok: boolean; error?: string; tipo?: CobrancaTipo }>
+  updateCobrancaTipo: (
+    id: string,
+    patch: { nome?: string; categoria?: CobrancaCategoria; ativo?: boolean },
+  ) => Promise<{ ok: boolean; error?: string; tipo?: CobrancaTipo }>
   openNovoFilho: boolean
   editingFilho: Filho | null
   openAgendar: boolean
@@ -504,6 +509,60 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [],
   )
 
+  const updateCobrancaTipo = useCallback(
+    async (
+      id: string,
+      patch: { nome?: string; categoria?: CobrancaCategoria; ativo?: boolean },
+    ) => {
+      const remote = await updateCobrancaTipoViaApi(id, patch)
+      if (remote.ok === true) {
+        setState((prev) => ({
+          ...prev,
+          cobrancaTipos: prev.cobrancaTipos.map((t) =>
+            t.id === id ? remote.tipo : t,
+          ),
+          cobrancas:
+            patch.nome != null
+              ? prev.cobrancas.map((c) =>
+                  c.tipoId === id
+                    ? { ...c, tipoNome: remote.tipo.nome }
+                    : c,
+                )
+              : prev.cobrancas,
+        }))
+        return { ok: true, tipo: remote.tipo }
+      }
+      // Offline / sample: apply locally
+      let updated: CobrancaTipo | undefined
+      setState((prev) => {
+        const cobrancaTipos = prev.cobrancaTipos.map((t) => {
+          if (t.id !== id) return t
+          updated = {
+            ...t,
+            ...(patch.nome != null ? { nome: patch.nome.trim() } : {}),
+            ...(patch.categoria != null ? { categoria: patch.categoria } : {}),
+            ...(patch.ativo != null ? { ativo: patch.ativo } : {}),
+          }
+          return updated
+        })
+        if (!updated) return prev
+        return {
+          ...prev,
+          cobrancaTipos,
+          cobrancas:
+            patch.nome != null
+              ? prev.cobrancas.map((c) =>
+                  c.tipoId === id ? { ...c, tipoNome: updated!.nome } : c,
+                )
+              : prev.cobrancas,
+        }
+      })
+      if (!updated) return { ok: false, error: 'not_found' }
+      return { ok: true, tipo: updated }
+    },
+    [],
+  )
+
   const value = useMemo(
     () => ({
       state,
@@ -518,6 +577,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addCobranca,
       markCobrancaPago,
       addCobrancaTipo,
+      updateCobrancaTipo,
       openNovoFilho,
       editingFilho,
       openAgendar,
@@ -540,6 +600,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addCobranca,
       markCobrancaPago,
       addCobrancaTipo,
+      updateCobrancaTipo,
       openNovoFilho,
       editingFilho,
       openAgendar,

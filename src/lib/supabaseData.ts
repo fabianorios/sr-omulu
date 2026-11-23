@@ -229,3 +229,32 @@ export async function sbCreateCobrancaTipo(input: {
   if (error || !data) return { ok: false, error: error?.message ?? 'create_failed' }
   return { ok: true, row: data as CobrancaTipoRow }
 }
+
+export async function sbUpdateCobrancaTipo(
+  id: string,
+  patch: { nome?: string; categoria?: CobrancaCategoria; ativo?: boolean },
+): Promise<{ ok: true; row: CobrancaTipoRow } | { ok: false; error: string }> {
+  const sb = getSupabaseBrowser()
+  if (!sb) return { ok: false, error: 'supabase_unconfigured' }
+  const body: Record<string, unknown> = {}
+  if (patch.nome != null) body.nome = patch.nome.trim()
+  if (patch.categoria != null) body.categoria = patch.categoria
+  if (patch.ativo != null) body.ativo = patch.ativo
+  if (Object.keys(body).length === 0) {
+    return { ok: false, error: 'empty_patch' }
+  }
+  const { data, error } = await sb
+    .from('cobranca_tipos')
+    .update(body)
+    .eq('id', id)
+    .select('*')
+    .single()
+  if (error || !data) return { ok: false, error: error?.message ?? 'update_failed' }
+  if (typeof body.nome === 'string') {
+    await sb
+      .from('cobrancas')
+      .update({ tipo_nome: body.nome, updated_at: new Date().toISOString() })
+      .eq('tipo_id', id)
+  }
+  return { ok: true, row: data as CobrancaTipoRow }
+}
