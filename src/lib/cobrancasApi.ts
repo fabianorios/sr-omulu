@@ -9,6 +9,7 @@ import { supabaseBrowserConfigured } from './supabaseBrowser'
 import {
   sbCreateCobranca,
   sbCreateCobrancaTipo,
+  sbDeleteCobranca,
   sbLoadCobrancas,
   sbUpdateCobranca,
   sbUpdateCobrancaTipo,
@@ -308,6 +309,29 @@ export async function updateCobrancaTipoViaApi(
       tipo: rowToCobrancaTipo(data.tipo),
       source: parseDbSource(data.source),
     }
+  } catch {
+    return { ok: false, error: 'network' }
+  }
+}
+
+export async function deleteCobrancaViaApi(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (supabaseBrowserConfigured()) {
+    const remote = await sbDeleteCobranca(id)
+    if (remote.ok === false) return { ok: false, error: remote.error }
+    return { ok: true }
+  }
+  try {
+    const res = await fetch(`/api/cobrancas/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      credentials: 'same-origin',
+    })
+    const data = (await res.json()) as { error?: string }
+    if (!res.ok) {
+      return { ok: false, error: data.error ?? `http_${res.status}` }
+    }
+    return { ok: true }
   } catch {
     return { ok: false, error: 'network' }
   }

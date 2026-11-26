@@ -9,7 +9,12 @@ import { emptyEndereco } from '../types'
 import { parseDbSource, type RemoteDbSource } from './dbSource'
 import { normalizeEntidades, sanitizeEntidadesForSave } from './entidades'
 import { supabaseBrowserConfigured } from './supabaseBrowser'
-import { sbCreateFilho, sbLoadFilhos, sbUpdateFilho } from './supabaseData'
+import {
+  sbCreateFilho,
+  sbDeleteFilho,
+  sbLoadFilhos,
+  sbUpdateFilho,
+} from './supabaseData'
 
 /** Shape returned by /api/filhos (snake_case from Postgres). */
 export type FilhoRow = {
@@ -219,6 +224,29 @@ export async function updateFilhoViaApi(
       filho: rowToFilho(data.filho),
       source: parseDbSource(data.source),
     }
+  } catch {
+    return { ok: false, error: 'network' }
+  }
+}
+
+export async function deleteFilhoViaApi(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (supabaseBrowserConfigured()) {
+    const remote = await sbDeleteFilho(id)
+    if (remote.ok === false) return { ok: false, error: remote.error }
+    return { ok: true }
+  }
+  try {
+    const res = await fetch(`/api/filhos/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      credentials: 'same-origin',
+    })
+    const data = (await res.json()) as { error?: string }
+    if (!res.ok) {
+      return { ok: false, error: data.error ?? `http_${res.status}` }
+    }
+    return { ok: true }
   } catch {
     return { ok: false, error: 'network' }
   }

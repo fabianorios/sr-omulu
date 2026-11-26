@@ -3,6 +3,7 @@ import { parseDbSource, type RemoteDbSource } from './dbSource'
 import { supabaseBrowserConfigured } from './supabaseBrowser'
 import {
   sbCreateObrigacao,
+  sbDeleteObrigacao,
   sbLoadObrigacoes,
   sbUpdateObrigacao,
 } from './supabaseData'
@@ -204,6 +205,29 @@ export async function updateObrigacaoViaApi(
       obrigacao: rowToObrigacao(data.obrigacao),
       source: parseDbSource(data.source),
     }
+  } catch {
+    return { ok: false, error: 'network' }
+  }
+}
+
+export async function deleteObrigacaoViaApi(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (supabaseBrowserConfigured()) {
+    const remote = await sbDeleteObrigacao(id)
+    if (remote.ok === false) return { ok: false, error: remote.error }
+    return { ok: true }
+  }
+  try {
+    const res = await fetch(`/api/obrigacoes/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      credentials: 'same-origin',
+    })
+    const data = (await res.json()) as { error?: string }
+    if (!res.ok) {
+      return { ok: false, error: data.error ?? `http_${res.status}` }
+    }
+    return { ok: true }
   } catch {
     return { ok: false, error: 'network' }
   }

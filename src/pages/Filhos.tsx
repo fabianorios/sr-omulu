@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { History, Pencil, Search, UserPlus } from 'lucide-react'
+import { History, Pencil, Search, Trash2, UserPlus } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
 import { StatusBadge } from '../components/StatusBadge'
@@ -21,10 +21,12 @@ export function Filhos() {
     loadingFilhos,
     setOpenNovoFilho,
     setEditingFilho,
+    deleteFilho,
   } = useApp()
   const { isAdmin } = useAuth()
   const [query, setQuery] = useState('')
   const [detailId, setDetailId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const tipoMap = useMemo(
     () => new Map(state.tipos.map((t) => [t.id, t])),
@@ -67,6 +69,22 @@ export function Filhos() {
   function openEdit(filho: Filho) {
     setDetailId(null)
     setEditingFilho(filho)
+  }
+
+  async function handleDelete(filho: Filho) {
+    if (!isAdmin) return
+    const ok = window.confirm(
+      `Excluir ${filho.nome}?\n\nIsso remove o cadastro e as obrigações/cobranças vinculadas. Esta ação não pode ser desfeita.`,
+    )
+    if (!ok) return
+    setDeletingId(filho.id)
+    const result = await deleteFilho(filho.id)
+    setDeletingId(null)
+    if (!result.ok) {
+      window.alert(result.error ?? 'Não foi possível excluir.')
+      return
+    }
+    if (detailId === filho.id) setDetailId(null)
   }
 
   return (
@@ -182,6 +200,17 @@ export function Filhos() {
                 <History size={13} />
                 Histórico
               </button>
+              {isAdmin ? (
+                <button
+                  type="button"
+                  disabled={deletingId === filho.id}
+                  onClick={() => void handleDelete(filho)}
+                  className="col-span-2 inline-flex items-center justify-center gap-1.5 rounded border border-[var(--color-border)] bg-white/70 px-2.5 py-2 text-xs font-medium text-[var(--color-status-vencida-fg)] hover:bg-[var(--color-parchment)] disabled:opacity-60"
+                >
+                  <Trash2 size={13} />
+                  Excluir
+                </button>
+              ) : null}
             </div>
           </article>
         ))}
@@ -266,6 +295,17 @@ export function Filhos() {
                       <History size={12} />
                       Histórico
                     </button>
+                    {isAdmin ? (
+                      <button
+                        type="button"
+                        disabled={deletingId === filho.id}
+                        onClick={() => void handleDelete(filho)}
+                        className="inline-flex items-center gap-1 rounded border border-[var(--color-border)] bg-white/70 px-2 py-1 text-xs font-medium text-[var(--color-status-vencida-fg)] hover:bg-[var(--color-parchment)] disabled:opacity-60"
+                      >
+                        <Trash2 size={12} />
+                        Excluir
+                      </button>
+                    ) : null}
                   </div>
                 </td>
               </tr>
@@ -359,7 +399,18 @@ export function Filhos() {
               </ul>
             )}
 
-            <div className="mt-5 flex justify-end gap-2">
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              {isAdmin ? (
+                <button
+                  type="button"
+                  disabled={deletingId === detailFilho.id}
+                  onClick={() => void handleDelete(detailFilho)}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-status-vencida-fg)] disabled:opacity-60"
+                >
+                  <Trash2 size={14} />
+                  Excluir
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => openEdit(detailFilho)}
