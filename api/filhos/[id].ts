@@ -196,6 +196,9 @@ export async function DELETE(request: Request): Promise<Response> {
   if (!id) return json({ error: 'missing_id' }, 400)
 
   try {
+    // filho_id is text without FK cascade — remove dependents first
+    await sql(`delete from obrigacoes where filho_id = $1`, [id])
+    await sql(`delete from cobrancas where filho_id = $1`, [id])
     const rows = await sql<{ id: string }>(
       `delete from filhos where id = $1 returning id`,
       [id],

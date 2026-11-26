@@ -78,6 +78,23 @@ export async function sbUpdateFilho(
   return { ok: true, row: data as FilhoRow }
 }
 
+export async function sbDeleteFilho(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const sb = getSupabaseBrowser()
+  if (!sb) return { ok: false, error: 'supabase_unconfigured' }
+  // filho_id is text without FK cascade — remove dependents first
+  const [obr, cob] = await Promise.all([
+    sb.from('obrigacoes').delete().eq('filho_id', id),
+    sb.from('cobrancas').delete().eq('filho_id', id),
+  ])
+  if (obr.error) return { ok: false, error: obr.error.message }
+  if (cob.error) return { ok: false, error: cob.error.message }
+  const { error } = await sb.from('filhos').delete().eq('id', id)
+  if (error) return { ok: false, error: error.message }
+  return { ok: true }
+}
+
 export async function sbLoadObrigacoes(): Promise<
   | { ok: true; rows: ObrigacaoRow[] }
   | { ok: false; error: string }
@@ -149,6 +166,16 @@ export async function sbUpdateObrigacao(
     .single()
   if (error || !data) return { ok: false, error: error?.message ?? 'update_failed' }
   return { ok: true, row: data as ObrigacaoRow }
+}
+
+export async function sbDeleteObrigacao(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const sb = getSupabaseBrowser()
+  if (!sb) return { ok: false, error: 'supabase_unconfigured' }
+  const { error } = await sb.from('obrigacoes').delete().eq('id', id)
+  if (error) return { ok: false, error: error.message }
+  return { ok: true }
 }
 
 export async function sbLoadCobrancas(): Promise<
@@ -228,6 +255,16 @@ export async function sbUpdateCobranca(
     .single()
   if (error || !data) return { ok: false, error: error?.message ?? 'update_failed' }
   return { ok: true, row: data as CobrancaRow }
+}
+
+export async function sbDeleteCobranca(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const sb = getSupabaseBrowser()
+  if (!sb) return { ok: false, error: 'supabase_unconfigured' }
+  const { error } = await sb.from('cobrancas').delete().eq('id', id)
+  if (error) return { ok: false, error: error.message }
+  return { ok: true }
 }
 
 export async function sbCreateCobrancaTipo(input: {

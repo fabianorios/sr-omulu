@@ -1,7 +1,15 @@
 import { useMemo, useState } from 'react'
-import { CheckCircle2, Pencil, Plus, Search, Wallet } from 'lucide-react'
+import {
+  CheckCircle2,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+  Wallet,
+} from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
+import { EditarCobrancaModal } from '../components/modals/EditarCobrancaModal'
 import {
   categoriaLabel,
   financeStatusLabel,
@@ -21,8 +29,14 @@ function matchesTipo(c: Cobranca, tipoId: string, tipoNome?: string): boolean {
 }
 
 export function Financeiro() {
-  const { state, setOpenNovaCobranca, markCobrancaPago, addCobrancaTipo, updateCobrancaTipo } =
-    useApp()
+  const {
+    state,
+    setOpenNovaCobranca,
+    markCobrancaPago,
+    deleteCobranca,
+    addCobrancaTipo,
+    updateCobrancaTipo,
+  } = useApp()
   const { isAdmin } = useAuth()
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('todos')
@@ -36,6 +50,7 @@ export function Financeiro() {
   const [editCat, setEditCat] = useState<CobrancaCategoria>('contribuicao')
   const [tipoBusy, setTipoBusy] = useState<string | null>(null)
   const [tipoError, setTipoError] = useState('')
+  const [editingCobranca, setEditingCobranca] = useState<Cobranca | null>(null)
 
   const filhoMap = useMemo(
     () => new Map(state.filhos.map((f) => [f.id, f])),
@@ -148,6 +163,13 @@ export function Financeiro() {
   }
 
   async function handleToggleAtivo(id: string, ativo: boolean) {
+    const tipo = state.cobrancaTipos.find((t) => t.id === id)
+    if (!ativo) {
+      const ok = window.confirm(
+        `Desativar o tipo "${tipo?.nome ?? id}"?\n\nEle deixa de aparecer nos filtros e no cadastro de novas cobranças.`,
+      )
+      if (!ok) return
+    }
     setTipoBusy(id)
     setTipoError('')
     const result = await updateCobrancaTipo(id, { ativo })
@@ -157,6 +179,22 @@ export function Financeiro() {
       return
     }
     if (!ativo && tipoFilter === id) setTipoFilter('todos')
+  }
+
+  async function handleDeleteCobranca(c: Cobranca, filhoNome: string) {
+    if (!isAdmin) return
+    const ok = window.confirm(
+      `Excluir cobrança de ${filhoNome} (${c.tipoNome}, ${formatBRL(c.valor)})?\n\nEsta ação não pode ser desfeita.`,
+    )
+    if (!ok) return
+    setBusyId(c.id)
+    const result = await deleteCobranca(c.id)
+    setBusyId(null)
+    if (!result.ok) {
+      window.alert(result.error ?? 'Não foi possível excluir.')
+      return
+    }
+    if (editingCobranca?.id === c.id) setEditingCobranca(null)
   }
 
   const statusFilters: { id: StatusFilter; label: string }[] = [
@@ -470,11 +508,45 @@ export function Financeiro() {
                   <CheckCircle2 size={14} />
                   {cobranca.pago ? 'Desmarcar pagamento' : 'Marcar como pago'}
                 </button>
+                {isAdmin ? (
+                  <div className="flex flex-wrap justify-end gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setEditingCobranca(cobranca)}
+                      className="inline-flex items-center gap-1 rounded-md border border-[var(--color-border)] px-2.5 py-1.5 text-xs font-semibold text-[var(--color-ink-muted)] hover:bg-[var(--color-parchment)]"
+                    >
+                      <Pencil size={12} />
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busyId === cobranca.id}
+                      onClick={() =>
+                        void handleDeleteCobranca(
+                          cobranca,
+                          filho?.nome ?? 'filho',
+                        )
+                      }
+                      className="inline-flex items-center gap-1 rounded-md border border-[var(--color-border)] px-2.5 py-1.5 text-xs font-semibold text-[var(--color-status-vencida-fg)] hover:bg-[var(--color-parchment)] disabled:opacity-60"
+                    >
+                      <Trash2 size={12} />
+                      Excluir
+                    </button>
+                  </div>
+                ) : null}
               </div>
             </div>
           </article>
         ))}
       </div>
+
+      {editingCobranca ? (
+        <EditarCobrancaModal
+          key={editingCobranca.id}
+          cobranca={editingCobranca}
+          onClose={() => setEditingCobranca(null)}
+        />
+      ) : null}
     </div>
   )
 }

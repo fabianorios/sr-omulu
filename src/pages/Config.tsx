@@ -126,7 +126,15 @@ export function Config() {
               </button>
               <button
                 type="button"
-                onClick={() => toggleTipo(tipo.id)}
+                onClick={() => {
+                  if (tipo.active) {
+                    const ok = window.confirm(
+                      `Desativar "${tipo.name}"?\n\nEle deixa de aparecer ao agendar novas obrigações.`,
+                    )
+                    if (!ok) return
+                  }
+                  toggleTipo(tipo.id)
+                }}
                 className="rounded border border-[var(--color-border)] px-3 py-1.5 text-xs font-semibold text-[var(--color-ink-muted)] hover:bg-[var(--color-parchment)]"
               >
                 {tipo.active ? 'Desativar' : 'Ativar'}

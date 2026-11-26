@@ -11,19 +11,28 @@ import {
   startOfWeek,
 } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { CalendarPlus, ChevronLeft, ChevronRight } from 'lucide-react'
+import {
+  CalendarPlus,
+  ChevronLeft,
+  ChevronRight,
+  Pencil,
+  Trash2,
+} from 'lucide-react'
 import { PAIS_DE_CABECA, type PaiDeCabeca } from '../data/catalog'
 import { REFERENCE_DATE } from '../data/mock'
 import { useApp } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
-import type { ObligationTypeId } from '../types'
+import { EditarObrigacaoModal } from '../components/modals/EditarObrigacaoModal'
+import type { ObligationTypeId, Obrigacao } from '../types'
 import { obrigacaoLabel } from '../types'
 import { formatBR, formatLongDay, parseDate } from '../utils/status'
 
 const WEEKDAYS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB']
 
+type DayItemKind = 'obrigacao' | 'evento'
+
 export function Agenda() {
-  const { state, setOpenNovaObrigacao } = useApp()
+  const { state, setOpenNovaObrigacao, deleteObrigacao } = useApp()
   const { isAdmin } = useAuth()
   const [month, setMonth] = useState(() => startOfMonth(REFERENCE_DATE))
   const [selected, setSelected] = useState(() => REFERENCE_DATE)
@@ -31,6 +40,8 @@ export function Agenda() {
   const [filterTipo, setFilterTipo] = useState<ObligationTypeId | 'Todos'>(
     'Todos',
   )
+  const [editingObr, setEditingObr] = useState<Obrigacao | null>(null)
+  const [busyId, setBusyId] = useState<string | null>(null)
 
   const filhoMap = useMemo(
     () => new Map(state.filhos.map((f) => [f.id, f])),
@@ -87,8 +98,14 @@ export function Agenda() {
   }
 
   const selectedItems = useMemo(() => {
-    const items: { id: string; title: string; detail: string; color: string }[] =
-      []
+    const items: {
+      id: string
+      kind: DayItemKind
+      title: string
+      detail: string
+      color: string
+      obrigacao?: Obrigacao
+    }[] = []
 
     for (const o of filteredObrigacoes) {
       if (isSameDay(parseDate(o.data), selected)) {
@@ -102,9 +119,11 @@ export function Agenda() {
               : ''
           items.push({
             id: o.id,
+            kind: 'obrigacao',
             title: filho.nome,
             detail: `${label}${itensHint} · Pai ${filho.paiDeCabeca} · Mãe ${filho.maeDeCabeca}`,
             color: tipo?.color ?? '#6B5B4A',
+            obrigacao: o,
           })
         }
       }
@@ -114,6 +133,7 @@ export function Agenda() {
       if (isSameDay(parseDate(e.data), selected)) {
         items.push({
           id: e.id,
+          kind: 'evento',
           title: e.titulo,
           detail: 'Evento da casa',
           color: 'var(--color-house-event)',
@@ -123,6 +143,22 @@ export function Agenda() {
 
     return items
   }, [filteredObrigacoes, selected, filhoMap, tipoMap, state.eventos])
+
+  async function handleDeleteObrigacao(o: Obrigacao, title: string) {
+    if (!isAdmin) return
+    const ok = window.confirm(
+      `Excluir obrigação de ${title}?\n\nEsta ação não pode ser desfeita.`,
+    )
+    if (!ok) return
+    setBusyId(o.id)
+    const result = await deleteObrigacao(o.id)
+    setBusyId(null)
+    if (!result.ok) {
+      window.alert(result.error ?? 'Não foi possível excluir.')
+      return
+    }
+    if (editingObr?.id === o.id) setEditingObr(null)
+  }
 
   const legend = [
     ...state.tipos.map((t) => ({
@@ -304,7 +340,7 @@ export function Agenda() {
                       className="mt-1 h-2.5 w-2.5 shrink-0 rounded-[2px]"
                       style={{ backgroundColor: item.color }}
                     />
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <p className="font-semibold text-[var(--color-ink)]">
                         {item.title}
                       </p>
@@ -314,6 +350,32 @@ export function Agenda() {
                       <p className="mt-1 text-[11px] text-[var(--color-ink-faint)]">
                         {formatBR(format(selected, 'yyyy-MM-dd'))}
                       </p>
+                      {isAdmin && item.kind === 'obrigacao' && item.obrigacao ? (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setEditingObr(item.obrigacao!)}
+                            className="inline-flex items-center gap-1 rounded border border-[var(--color-border)] bg-white/70 px-2 py-1 text-xs font-medium text-[var(--color-forest)] hover:bg-[var(--color-parchment)]"
+                          >
+                            <Pencil size={12} />
+                            Editar
+                          </button>
+                          <button
+                            type="button"
+                            disabled={busyId === item.id}
+                            onClick={() =>
+                              void handleDeleteObrigacao(
+                                item.obrigacao!,
+                                item.title,
+                              )
+                            }
+                            className="inline-flex items-center gap-1 rounded border border-[var(--color-border)] bg-white/70 px-2 py-1 text-xs font-medium text-[var(--color-status-vencida-fg)] hover:bg-[var(--color-parchment)] disabled:opacity-60"
+                          >
+                            <Trash2 size={12} />
+                            Excluir
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 </li>
@@ -322,6 +384,14 @@ export function Agenda() {
           )}
         </aside>
       </div>
+
+      {editingObr ? (
+        <EditarObrigacaoModal
+          key={editingObr.id}
+          obrigacao={editingObr}
+          onClose={() => setEditingObr(null)}
+        />
+      ) : null}
     </div>
   )
 }

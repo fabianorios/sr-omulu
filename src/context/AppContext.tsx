@@ -17,6 +17,7 @@ import { useAuth } from './AuthContext'
 import {
   createCobrancaTipoViaApi,
   createCobrancaViaApi,
+  deleteCobrancaViaApi,
   loadCobrancasFromApi,
   loadLocalCobrancas,
   saveLocalCobrancas,
@@ -25,6 +26,7 @@ import {
 } from '../lib/cobrancasApi'
 import {
   createFilhoViaApi,
+  deleteFilhoViaApi,
   loadFilhosFromApi,
   loadLocalFilhos,
   saveLocalFilhos,
@@ -32,6 +34,7 @@ import {
 } from '../lib/filhosApi'
 import {
   createObrigacaoViaApi,
+  deleteObrigacaoViaApi,
   loadObrigacoesFromApi,
   updateObrigacaoViaApi,
 } from '../lib/obrigacoesApi'
@@ -59,6 +62,7 @@ interface AppContextValue {
     id: string,
     filho: FilhoInput,
   ) => Promise<{ ok: boolean; error?: string }>
+  deleteFilho: (id: string) => Promise<{ ok: boolean; error?: string }>
   addObrigacao: (
     obrigacao: Omit<Obrigacao, 'id'> & { id?: string },
   ) => Promise<{ ok: boolean; error?: string }>
@@ -66,6 +70,7 @@ interface AppContextValue {
     id: string,
     patch: Partial<Obrigacao>,
   ) => Promise<{ ok: boolean; error?: string }>
+  deleteObrigacao: (id: string) => Promise<{ ok: boolean; error?: string }>
   /** Replica obrigação manual aos filhos; pula duplicatas (mesmo nome+data ou mesmo lote). */
   replicateObrigacao: (input: {
     nome: string
@@ -84,10 +89,15 @@ interface AppContextValue {
   addCobranca: (
     cobranca: CobrancaInput,
   ) => Promise<{ ok: boolean; error?: string }>
+  updateCobranca: (
+    id: string,
+    patch: Partial<CobrancaInput> & { pago?: boolean },
+  ) => Promise<{ ok: boolean; error?: string }>
   markCobrancaPago: (
     id: string,
     pago: boolean,
   ) => Promise<{ ok: boolean; error?: string }>
+  deleteCobranca: (id: string) => Promise<{ ok: boolean; error?: string }>
   addCobrancaTipo: (input: {
     nome: string
     categoria: CobrancaCategoria
@@ -356,6 +366,49 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return { ok: false, error: remote.error }
   }, [])
 
+  const deleteFilho = useCallback(async (id: string) => {
+    const remote = await deleteFilhoViaApi(id)
+    if (remote.ok === true) {
+      setState((prev) => ({
+        ...prev,
+        filhos: prev.filhos.filter((f) => f.id !== id),
+        obrigacoes: prev.obrigacoes.filter((o) => o.filhoId !== id),
+        cobrancas: prev.cobrancas.filter((c) => c.filhoId !== id),
+      }))
+      return { ok: true }
+    }
+
+    if (
+      remote.error === 'network' ||
+      remote.error.startsWith('http_5') ||
+      remote.error === 'not_found'
+    ) {
+      setState((prev) => {
+        const filhos = prev.filhos.filter((f) => f.id !== id)
+        const cobrancas = prev.cobrancas.filter((c) => c.filhoId !== id)
+        if (prev.dataSource === 'local' || prev.dataSource === 'sample') {
+          saveLocalFilhos(filhos)
+          saveLocalCobrancas(cobrancas)
+        }
+        return {
+          ...prev,
+          filhos,
+          obrigacoes: prev.obrigacoes.filter((o) => o.filhoId !== id),
+          cobrancas,
+          dataSource:
+            prev.dataSource === 'supabase' ||
+            prev.dataSource === 'postgres' ||
+            prev.dataSource === 'pglite'
+              ? prev.dataSource
+              : 'local',
+        }
+      })
+      return { ok: true }
+    }
+
+    return { ok: false, error: remote.error }
+  }, [])
+
   const addObrigacao = useCallback(
     async (obrigacao: Omit<Obrigacao, 'id'> & { id?: string }) => {
       const payload = {
@@ -412,6 +465,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
     },
     [],
   )
+
+  const deleteObrigacao = useCallback(async (id: string) => {
+    const remote = await deleteObrigacaoViaApi(id)
+    if (remote.ok === true) {
+      setState((prev) => ({
+        ...prev,
+        obrigacoes: prev.obrigacoes.filter((o) => o.id !== id),
+      }))
+      return { ok: true }
+    }
+    if (
+      remote.error === 'network' ||
+      remote.error.startsWith('http_5') ||
+      remote.error === 'not_found'
+    ) {
+      setState((prev) => ({
+        ...prev,
+        obrigacoes: prev.obrigacoes.filter((o) => o.id !== id),
+      }))
+      return { ok: true }
+    }
+    return { ok: false, error: remote.error }
+  }, [])
 
   const replicateObrigacao = useCallback(
     async (input: {
@@ -570,31 +646,74 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return { ok: false, error: remote.error }
   }, [])
 
+  const updateCobranca = useCallback(
+    async (id: string, patch: Partial<CobrancaInput> & { pago?: boolean }) => {
+      const remote = await updateCobrancaViaApi(id, patch)
+      if (remote.ok === true) {
+        setState((prev) => ({
+          ...prev,
+          cobrancas: prev.cobrancas.map((c) =>
+            c.id === id ? remote.cobranca : c,
+          ),
+        }))
+        return { ok: true }
+      }
+      if (
+        remote.error === 'network' ||
+        remote.error.startsWith('http_5') ||
+        remote.error.startsWith('http_')
+      ) {
+        setState((prev) => {
+          const cobrancas = prev.cobrancas.map((c) => {
+            if (c.id !== id) return c
+            const next: Cobranca = { ...c, ...patch, id: c.id }
+            if (patch.pago != null) {
+              next.pago = patch.pago
+              next.pagoEm = patch.pago
+                ? new Date().toISOString()
+                : undefined
+            }
+            return next
+          })
+          saveLocalCobrancas(cobrancas)
+          return { ...prev, cobrancas }
+        })
+        return { ok: true }
+      }
+      return { ok: false, error: remote.error }
+    },
+    [],
+  )
+
   const markCobrancaPago = useCallback(async (id: string, pago: boolean) => {
-    const remote = await updateCobrancaViaApi(id, { pago })
+    return updateCobranca(id, { pago })
+  }, [updateCobranca])
+
+  const deleteCobranca = useCallback(async (id: string) => {
+    const remote = await deleteCobrancaViaApi(id)
     if (remote.ok === true) {
-      setState((prev) => ({
-        ...prev,
-        cobrancas: prev.cobrancas.map((c) =>
-          c.id === id ? remote.cobranca : c,
-        ),
-      }))
+      setState((prev) => {
+        const cobrancas = prev.cobrancas.filter((c) => c.id !== id)
+        if (prev.dataSource === 'local' || prev.dataSource === 'sample') {
+          saveLocalCobrancas(cobrancas)
+        }
+        return { ...prev, cobrancas }
+      })
       return { ok: true }
     }
-    setState((prev) => {
-      const cobrancas = prev.cobrancas.map((c) =>
-        c.id === id
-          ? {
-              ...c,
-              pago,
-              pagoEm: pago ? new Date().toISOString() : undefined,
-            }
-          : c,
-      )
-      saveLocalCobrancas(cobrancas)
-      return { ...prev, cobrancas }
-    })
-    return { ok: true }
+    if (
+      remote.error === 'network' ||
+      remote.error.startsWith('http_5') ||
+      remote.error === 'not_found'
+    ) {
+      setState((prev) => {
+        const cobrancas = prev.cobrancas.filter((c) => c.id !== id)
+        saveLocalCobrancas(cobrancas)
+        return { ...prev, cobrancas }
+      })
+      return { ok: true }
+    }
+    return { ok: false, error: remote.error }
   }, [])
 
   const addCobrancaTipo = useCallback(
@@ -694,13 +813,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
       resetDemo,
       addFilho,
       updateFilho,
+      deleteFilho,
       addObrigacao,
       updateObrigacao,
+      deleteObrigacao,
       replicateObrigacao,
       toggleTipo,
       updateTipo,
       addCobranca,
+      updateCobranca,
       markCobrancaPago,
+      deleteCobranca,
       addCobrancaTipo,
       updateCobrancaTipo,
       openNovoFilho,
@@ -720,13 +843,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
       resetDemo,
       addFilho,
       updateFilho,
+      deleteFilho,
       addObrigacao,
       updateObrigacao,
+      deleteObrigacao,
       replicateObrigacao,
       toggleTipo,
       updateTipo,
       addCobranca,
+      updateCobranca,
       markCobrancaPago,
+      deleteCobranca,
       addCobrancaTipo,
       updateCobrancaTipo,
       openNovoFilho,
