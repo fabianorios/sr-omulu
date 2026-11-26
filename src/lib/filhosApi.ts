@@ -8,6 +8,7 @@ import type { EntidadeLinha, Filho, FilhoInput } from '../types'
 import { emptyEndereco } from '../types'
 import { parseDbSource, type RemoteDbSource } from './dbSource'
 import { normalizeEntidades, sanitizeEntidadesForSave } from './entidades'
+import { isDbUuid } from './ids'
 import { supabaseBrowserConfigured } from './supabaseBrowser'
 import {
   sbCreateFilho,
@@ -199,6 +200,9 @@ export async function updateFilhoViaApi(
   | { ok: true; filho: Filho; source: RemoteDbSource }
   | { ok: false; error: string }
 > {
+  if (!isDbUuid(id)) {
+    return { ok: false, error: 'invalid_id' }
+  }
   if (supabaseBrowserConfigured()) {
     const remote = await sbUpdateFilho(id, filho)
     if (remote.ok === false) return { ok: false, error: remote.error }
@@ -232,6 +236,10 @@ export async function updateFilhoViaApi(
 export async function deleteFilhoViaApi(
   id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  // Never send mock/demo ids (f1, f11, …) to Postgres uuid columns.
+  if (!isDbUuid(id)) {
+    return { ok: false, error: 'invalid_id' }
+  }
   if (supabaseBrowserConfigured()) {
     const remote = await sbDeleteFilho(id)
     if (remote.ok === false) return { ok: false, error: remote.error }

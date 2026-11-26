@@ -10,6 +10,9 @@ import { dbMode } from '../lib/db'
 
 type ObrigacaoRow = Record<string, unknown>
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
 function parseItens(raw: unknown): {
   nome: string
   quantidade: number
@@ -70,6 +73,9 @@ export async function POST(request: Request): Promise<Response> {
   const data = String(body.data ?? '').trim().slice(0, 10)
   if (!filhoId || !tipoId || !data) {
     return json({ error: 'missing_fields' }, 400)
+  }
+  if (!UUID_RE.test(filhoId)) {
+    return json({ error: 'invalid_id' }, 400)
   }
   if (!canAccessFilho(session, filhoId)) {
     return json({ error: 'forbidden' }, 403)
