@@ -553,4 +553,15 @@ create policy cobranca_tipos_write_admin on public.cobranca_tipos
   using (public.current_app_role() = 'admin')
   with check (public.current_app_role() = 'admin');
 
+drop policy if exists obrigacao_tipos_select_auth on public.obrigacao_tipos;
+create policy obrigacao_tipos_select_auth on public.obrigacao_tipos
+  for select to authenticated
+  using (true);
+
+drop policy if exists obrigacao_tipos_write_admin on public.obrigacao_tipos;
+create policy obrigacao_tipos_write_admin on public.obrigacao_tipos
+  for all to authenticated
+  using (public.current_app_role() = 'admin')
+  with check (public.current_app_role() = 'admin');
+
 -- sessoes stay server-only (no policies for anon/authenticated)

@@ -1,13 +1,27 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { CalendarPlus, Plus, Trash2, Users, X } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
-import type { ObrigacaoItem } from '../../types'
+import type { ObligationTypeId, ObrigacaoItem } from '../../types'
 import { emptyObrigacaoItem } from '../../types'
 
+/**
+ * Agenda instâncias no calendário a partir de um tipo cadastrado em Config.
+ * Não cria obrigação avulsa com nome livre — o catálogo é a fonte.
+ */
 export function NovaObrigacaoModal({ onClose }: { onClose: () => void }) {
   const { state, replicateObrigacao } = useApp()
 
-  const [nome, setNome] = useState('')
+  const activeTipos = useMemo(
+    () =>
+      state.tipos
+        .filter((t) => t.active)
+        .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')),
+    [state.tipos],
+  )
+
+  const [tipoId, setTipoId] = useState<ObligationTypeId>(
+    activeTipos[0]?.id ?? '',
+  )
   const [data, setData] = useState('')
   const [observacoes, setObservacoes] = useState('')
   const [itens, setItens] = useState<ObrigacaoItem[]>([emptyObrigacaoItem()])
@@ -17,10 +31,30 @@ export function NovaObrigacaoModal({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
 
+  const tipo = useMemo(
+    () => activeTipos.find((t) => t.id === tipoId),
+    [activeTipos, tipoId],
+  )
+
   const filhosOrdenados = useMemo(
     () => [...state.filhos].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')),
     [state.filhos],
   )
+
+  useEffect(() => {
+    if (!tipoId && activeTipos[0]) {
+      setTipoId(activeTipos[0].id)
+    }
+  }, [activeTipos, tipoId])
+
+  useEffect(() => {
+    const padrao = tipo?.itensPadrao
+    if (padrao && padrao.length > 0) {
+      setItens(padrao.map((i) => ({ ...i })))
+    } else {
+      setItens([emptyObrigacaoItem()])
+    }
+  }, [tipoId, tipo?.itensPadrao])
 
   function updateItem(index: number, patch: Partial<ObrigacaoItem>) {
     setItens((prev) =>
@@ -51,9 +85,12 @@ export function NovaObrigacaoModal({ onClose }: { onClose: () => void }) {
     e.preventDefault()
     setError('')
     setInfo('')
-    const nomeTrim = nome.trim()
-    if (!nomeTrim || !data) {
-      setError('Informe o nome e a data da obrigação.')
+    if (!tipoId || !data) {
+      setError('Selecione o tipo cadastrado e a data.')
+      return
+    }
+    if (!tipo) {
+      setError('Cadastre um tipo em Configurações antes de agendar.')
       return
     }
     const filhoIds = selectAll
@@ -77,7 +114,7 @@ export function NovaObrigacaoModal({ onClose }: { onClose: () => void }) {
 
     setSaving(true)
     const result = await replicateObrigacao({
-      nome: nomeTrim,
+      tipoId,
       data,
       observacoes: observacoes.trim() || undefined,
       itens: cleanItens,
@@ -88,24 +125,25 @@ export function NovaObrigacaoModal({ onClose }: { onClose: () => void }) {
     if (!result.ok) {
       setError(
         result.error === 'missing_fields'
-          ? 'Preencha nome, data e filhos.'
-          : (result.error ?? 'Não foi possível replicar.'),
+          ? 'Preencha tipo, data e filhos.'
+          : result.error === 'tipo_invalido'
+            ? 'Tipo inválido ou inativo. Cadastre em Configurações.'
+            : (result.error ?? 'Não foi possível replicar.'),
       )
       return
     }
 
     if (result.created === 0 && result.skipped > 0) {
       setInfo(
-        `Nenhuma nova obrigação criada: ${result.skipped} filho(s) já tinham esta obrigação (mesmo nome e data).`,
+        `Nenhuma nova obrigação criada: ${result.skipped} filho(s) já tinham este tipo na mesma data.`,
       )
       return
     }
 
     if (result.skipped > 0) {
       setInfo(
-        `Criadas ${result.created}. Ignorados ${result.skipped} (já existiam com o mesmo nome e data).`,
+        `Criadas ${result.created}. Ignorados ${result.skipped} (já existiam com o mesmo tipo e data).`,
       )
-      // still close after short success with skips — keep open so user sees message
       return
     }
 
@@ -131,7 +169,7 @@ export function NovaObrigacaoModal({ onClose }: { onClose: () => void }) {
               id="nova-obrigacao-title"
               className="font-serif text-xl font-semibold text-[var(--color-forest)]"
             >
-              Nova obrigação
+              Agendar obrigação
             </h2>
           </div>
           <button
@@ -144,24 +182,39 @@ export function NovaObrigacaoModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 px-5 py-5">
+        <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4 px-5 py-5">
           <p className="text-sm text-[var(--color-ink-muted)]">
-            Criação manual: informe nome, data e itens. Sem cálculo automático
-            de ciclo. Em seguida, replique aos filhos selecionados.
+            Escolha um tipo cadastrado em Configurações e replique aos filhos.
+            Novos tipos de obrigação são criados no cadastro, não aqui.
           </p>
 
-          <label className="block">
-            <span className="mb-1.5 block text-xs font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase">
-              Nome da obrigação
-            </span>
-            <input
-              required
-              value={nome}
-              onChange={(e) => setNome(e.target.value)}
-              placeholder="Ex.: Obrigação de Oxalá 2026"
-              className="w-full rounded-md border border-[var(--color-border)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--color-forest)] focus:ring-2 focus:ring-[var(--color-forest)]/20"
-            />
-          </label>
+          {activeTipos.length === 0 ? (
+            <p className="rounded-md border border-[var(--color-border)] bg-[var(--color-parchment)]/50 px-3 py-2 text-sm text-[var(--color-ink)]">
+              Nenhum tipo ativo. Cadastre em{' '}
+              <strong>Configurações → Tipos de Obrigações</strong>.
+            </p>
+          ) : (
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase">
+                Tipo cadastrado
+              </span>
+              <select
+                required
+                value={tipoId}
+                onChange={(e) => setTipoId(e.target.value)}
+                className="w-full rounded-md border border-[var(--color-border)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--color-forest)] focus:ring-2 focus:ring-[var(--color-forest)]/20"
+              >
+                {activeTipos.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                    {t.yearsOffset != null
+                      ? ` (+${t.yearsOffset}a)`
+                      : ' (pontual)'}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
 
           <label className="block">
             <span className="mb-1.5 block text-xs font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase">
@@ -286,8 +339,8 @@ export function NovaObrigacaoModal({ onClose }: { onClose: () => void }) {
               </ul>
             )}
             <p className="text-[11px] text-[var(--color-ink-faint)]">
-              Se o filho já tiver obrigação com o mesmo nome e data, será
-              ignorado (sem duplicar).
+              Se o filho já tiver o mesmo tipo nesta data, será ignorado (sem
+              duplicar).
             </p>
           </section>
 
@@ -310,7 +363,11 @@ export function NovaObrigacaoModal({ onClose }: { onClose: () => void }) {
             </button>
             <button
               type="submit"
-              disabled={saving || filhosOrdenados.length === 0}
+              disabled={
+                saving ||
+                filhosOrdenados.length === 0 ||
+                activeTipos.length === 0
+              }
               className="rounded-md bg-[var(--color-forest)] px-4 py-2 text-sm font-semibold text-[var(--color-cream)] hover:bg-[var(--color-forest-hover)] disabled:opacity-60"
             >
               {saving ? 'Replicando…' : 'Replicar aos filhos'}

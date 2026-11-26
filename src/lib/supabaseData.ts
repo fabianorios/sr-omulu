@@ -2,12 +2,35 @@ import type { FilhoRow } from './filhosApi'
 import type { ObrigacaoRow } from './obrigacoesApi'
 import type { CobrancaRow, CobrancaTipoRow } from './cobrancasApi'
 import { getSupabaseBrowser } from './supabaseBrowser'
-import type { FilhoInput } from '../types'
+import type { FilhoInput, ObrigacaoItem } from '../types'
 import type { Obrigacao } from '../types'
 import type { CobrancaInput, CobrancaCategoria } from '../types'
 import { sanitizeEntidadesForSave } from './entidades'
 import { emptyEndereco } from '../types'
+import { cleanItens } from './obrigacoesApi'
 import { isDbUuid } from './ids'
+
+export type ObrigacaoTipoRow = {
+  id: string
+  nome: string
+  description: string | null
+  years_offset: number | null
+  is_festiva: boolean | null
+  color: string | null
+  ativo: boolean | null
+  itens_padrao: unknown
+}
+
+type ObrigacaoTipoWrite = {
+  id?: string
+  name: string
+  description?: string
+  yearsOffset?: number | null
+  isFestiva?: boolean
+  color?: string
+  active?: boolean
+  itensPadrao?: ObrigacaoItem[]
+}
 
 function filhoInsert(filho: FilhoInput) {
   const endereco = filho.endereco ?? emptyEndereco()
@@ -182,6 +205,122 @@ export async function sbDeleteObrigacao(
   const sb = getSupabaseBrowser()
   if (!sb) return { ok: false, error: 'supabase_unconfigured' }
   const { error } = await sb.from('obrigacoes').delete().eq('id', id)
+  if (error) return { ok: false, error: error.message }
+  return { ok: true }
+}
+
+export async function sbLoadObrigacaoTipos(): Promise<
+  | { ok: true; rows: ObrigacaoTipoRow[] }
+  | { ok: false; error: string }
+> {
+  const sb = getSupabaseBrowser()
+  if (!sb) return { ok: false, error: 'supabase_unconfigured' }
+  const { data, error } = await sb
+    .from('obrigacao_tipos')
+    .select('*')
+    .order('nome')
+  if (error) {
+    if (error.code === 'PGRST301' || error.message.includes('JWT')) {
+      return { ok: false, error: 'unauthorized' }
+    }
+    return { ok: false, error: error.message }
+  }
+  return { ok: true, rows: (data ?? []) as ObrigacaoTipoRow[] }
+}
+
+export async function sbCreateObrigacaoTipo(
+  input: ObrigacaoTipoWrite,
+): Promise<{ ok: true; row: ObrigacaoTipoRow } | { ok: false; error: string }> {
+  const sb = getSupabaseBrowser()
+  if (!sb) return { ok: false, error: 'supabase_unconfigured' }
+  const id =
+    input.id?.trim() ||
+    (typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `ot_${Math.random().toString(36).slice(2, 10)}`)
+  const { data, error } = await sb
+    .from('obrigacao_tipos')
+    .insert({
+      id,
+      nome: input.name.trim(),
+      description: (input.description ?? '').trim(),
+      years_offset:
+        input.yearsOffset != null && Number(input.yearsOffset) > 0
+          ? Math.floor(Number(input.yearsOffset))
+          : null,
+      is_festiva: Boolean(input.isFestiva),
+      color: (input.color ?? '#6B5B4A').trim() || '#6B5B4A',
+      ativo: true,
+      itens_padrao: cleanItens(input.itensPadrao),
+    })
+    .select('*')
+    .single()
+  if (error || !data) {
+    const msg = error?.message ?? 'create_failed'
+    if (error?.code === '23505' || /unique|duplicate/i.test(msg)) {
+      return { ok: false, error: 'nome_exists' }
+    }
+    return { ok: false, error: msg }
+  }
+  return { ok: true, row: data as ObrigacaoTipoRow }
+}
+
+export async function sbUpdateObrigacaoTipo(
+  id: string,
+  patch: Partial<ObrigacaoTipoWrite> & { active?: boolean },
+): Promise<{ ok: true; row: ObrigacaoTipoRow } | { ok: false; error: string }> {
+  const sb = getSupabaseBrowser()
+  if (!sb) return { ok: false, error: 'supabase_unconfigured' }
+  const body: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  }
+  if (patch.name != null) body.nome = patch.name.trim()
+  if (patch.description != null) body.description = patch.description.trim()
+  if ('yearsOffset' in patch) {
+    body.years_offset =
+      patch.yearsOffset != null && Number(patch.yearsOffset) > 0
+        ? Math.floor(Number(patch.yearsOffset))
+        : null
+  }
+  if (patch.isFestiva != null) body.is_festiva = Boolean(patch.isFestiva)
+  if (patch.color != null) body.color = patch.color.trim() || '#6B5B4A'
+  if (patch.active != null) body.ativo = Boolean(patch.active)
+  if (patch.itensPadrao != null) {
+    body.itens_padrao = cleanItens(patch.itensPadrao)
+  }
+  if (Object.keys(body).length <= 1) {
+    return { ok: false, error: 'empty_patch' }
+  }
+  const { data, error } = await sb
+    .from('obrigacao_tipos')
+    .update(body)
+    .eq('id', id)
+    .select('*')
+    .single()
+  if (error || !data) {
+    const msg = error?.message ?? 'update_failed'
+    if (error?.code === '23505' || /unique|duplicate/i.test(msg)) {
+      return { ok: false, error: 'nome_exists' }
+    }
+    return { ok: false, error: msg }
+  }
+  return { ok: true, row: data as ObrigacaoTipoRow }
+}
+
+export async function sbDeleteObrigacaoTipo(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const sb = getSupabaseBrowser()
+  if (!sb) return { ok: false, error: 'supabase_unconfigured' }
+  const { count, error: countError } = await sb
+    .from('obrigacoes')
+    .select('id', { count: 'exact', head: true })
+    .eq('tipo_id', id)
+  if (countError) return { ok: false, error: countError.message }
+  if ((count ?? 0) > 0) {
+    return { ok: false, error: 'in_use' }
+  }
+  const { error } = await sb.from('obrigacao_tipos').delete().eq('id', id)
   if (error) return { ok: false, error: error.message }
   return { ok: true }
 }

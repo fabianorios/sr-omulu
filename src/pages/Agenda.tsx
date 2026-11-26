@@ -189,7 +189,7 @@ export function Agenda() {
             className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-[var(--color-forest)] px-3.5 py-2 text-sm font-semibold text-[var(--color-cream)] hover:bg-[var(--color-forest-hover)]"
           >
             <CalendarPlus size={16} />
-            Nova obrigação
+            Agendar obrigação
           </button>
         ) : null}
       </div>

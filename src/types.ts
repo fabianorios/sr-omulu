@@ -2,15 +2,12 @@ import type { MaeDeCabeca, PaiDeCabeca, TipoEntidade } from './data/catalog'
 
 export type ObligationStatus = 'em_dia' | 'proxima' | 'vencida'
 
-export type ObligationTypeId =
-  | '1_ano'
-  | '3_anos'
-  | '7_anos'
-  | 'feitura'
-  | 'troca_guia'
-  | 'festiva'
-  /** Criação manual (sem cálculo automático de ciclo). */
-  | 'manual'
+/**
+ * Id do tipo no catálogo (`obrigacao_tipos`).
+ * Seeds fixos: 1_ano, 3_anos, 7_anos, feitura, troca_guia, festiva, manual.
+ * Tipos novos usam uuid text.
+ */
+export type ObligationTypeId = string
 
 export interface ObligationType {
   id: ObligationTypeId
@@ -71,7 +68,10 @@ export interface Obrigacao {
   data: string
   ultimaData?: string
   itens: ObrigacaoItem[]
-  /** Título livre — obrigações manuais (`tipoId: 'manual'`). */
+  /**
+   * Título livre (legado / snapshot). Preferir o nome do tipo no catálogo;
+   * usado quando o tipo foi removido ou em linhas antigas `manual`.
+   */
   nome?: string
   observacoes?: string
   /** Lote de replicação aos filhos (idempotência por filho+lote). */

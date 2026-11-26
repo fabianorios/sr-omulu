@@ -106,9 +106,9 @@ export function EditarObrigacaoModal({ obrigacao, onClose }: Props) {
           />
         </label>
 
-        {obrigacao.tipoId === 'manual' ? (
+        {obrigacao.nome || !tipo ? (
           <label className="mt-3 block text-xs font-semibold text-[var(--color-ink-muted)] uppercase">
-            Nome
+            Nome (legado)
             <input
               value={nome}
               onChange={(e) => setNome(e.target.value)}

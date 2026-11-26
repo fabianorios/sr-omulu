@@ -12,6 +12,7 @@ import {
   createSampleCobrancas,
   createSampleFilhos,
   DEFAULT_COBRANCA_TIPOS,
+  DEFAULT_TIPOS,
 } from '../data/mock'
 import { useAuth } from './AuthContext'
 import {
@@ -39,6 +40,13 @@ import {
   loadObrigacoesFromApi,
   updateObrigacaoViaApi,
 } from '../lib/obrigacoesApi'
+import {
+  createObrigacaoTipoViaApi,
+  deleteObrigacaoTipoViaApi,
+  loadObrigacaoTiposFromApi,
+  updateObrigacaoTipoViaApi,
+  type ObrigacaoTipoInput,
+} from '../lib/obrigacaoTiposApi'
 import { supabaseBrowserConfigured } from '../lib/supabaseBrowser'
 import type {
   AppState,
@@ -73,9 +81,9 @@ interface AppContextValue {
     patch: Partial<Obrigacao>,
   ) => Promise<{ ok: boolean; error?: string }>
   deleteObrigacao: (id: string) => Promise<{ ok: boolean; error?: string }>
-  /** Replica obrigação manual aos filhos; pula duplicatas (mesmo nome+data ou mesmo lote). */
+  /** Replica obrigação do catálogo aos filhos; pula duplicatas (mesmo tipo+data ou lote). */
   replicateObrigacao: (input: {
-    nome: string
+    tipoId: ObligationTypeId
     data: string
     observacoes?: string
     itens: Obrigacao['itens']
@@ -86,8 +94,19 @@ interface AppContextValue {
     skipped: number
     error?: string
   }>
-  toggleTipo: (id: ObligationTypeId) => void
-  updateTipo: (id: ObligationTypeId, patch: Partial<ObligationType>) => void
+  addTipo: (
+    input: ObrigacaoTipoInput,
+  ) => Promise<{ ok: boolean; error?: string; tipo?: ObligationType }>
+  updateTipo: (
+    id: ObligationTypeId,
+    patch: Partial<ObrigacaoTipoInput> & { active?: boolean },
+  ) => Promise<{ ok: boolean; error?: string; tipo?: ObligationType }>
+  toggleTipo: (
+    id: ObligationTypeId,
+  ) => Promise<{ ok: boolean; error?: string }>
+  deleteTipo: (
+    id: ObligationTypeId,
+  ) => Promise<{ ok: boolean; error?: string }>
   addCobranca: (
     cobranca: CobrancaInput,
   ) => Promise<{ ok: boolean; error?: string }>
@@ -178,11 +197,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     let cancelled = false
     ;(async () => {
       setLoadingFilhos(true)
-      const [remoteFilhos, remoteObr, remoteFin] = await Promise.all([
-        loadFilhosFromApi(),
-        loadObrigacoesFromApi(),
-        loadCobrancasFromApi(),
-      ])
+      const [remoteFilhos, remoteObr, remoteFin, remoteTipos] =
+        await Promise.all([
+          loadFilhosFromApi(),
+          loadObrigacoesFromApi(),
+          loadCobrancasFromApi(),
+          loadObrigacaoTiposFromApi(),
+        ])
       if (cancelled) return
 
       // Unauthorized: do not hydrate PII samples into the client
@@ -282,6 +303,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
             ...next,
             cobrancas: [],
             cobrancaTipos: DEFAULT_COBRANCA_TIPOS.map((t) => ({ ...t })),
+          }
+        }
+
+        if (
+          remoteTipos.source === 'supabase' ||
+          remoteTipos.source === 'postgres' ||
+          remoteTipos.source === 'pglite'
+        ) {
+          if (remoteTipos.tipos.length > 0) {
+            next = { ...next, tipos: remoteTipos.tipos }
+          } else {
+            next = {
+              ...next,
+              tipos: DEFAULT_TIPOS.map((t) => ({
+                ...t,
+                itensPadrao: t.itensPadrao?.map((i) => ({ ...i })),
+              })),
+            }
           }
         }
 
@@ -601,16 +640,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const replicateObrigacao = useCallback(
     async (input: {
-      nome: string
+      tipoId: ObligationTypeId
       data: string
       observacoes?: string
       itens: Obrigacao['itens']
       filhoIds: string[]
     }) => {
-      const nome = input.nome.trim()
+      const tipoId = String(input.tipoId ?? '').trim()
       const data = input.data.trim().slice(0, 10)
       const filhoIds = [...new Set(input.filhoIds.filter(Boolean))]
-      if (!nome || !data || filhoIds.length === 0) {
+      if (!tipoId || !data || filhoIds.length === 0) {
         return {
           ok: false,
           created: 0,
@@ -619,12 +658,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      const tipo = state.tipos.find((t) => t.id === tipoId)
+      if (!tipo || !tipo.active) {
+        return {
+          ok: false,
+          created: 0,
+          skipped: 0,
+          error: 'tipo_invalido',
+        }
+      }
+
       const loteId =
         typeof crypto !== 'undefined' && 'randomUUID' in crypto
           ? crypto.randomUUID()
           : uid('lote')
 
-      const nomeKey = nome.toLowerCase()
       let created = 0
       let skipped = 0
       let lastError: string | undefined
@@ -640,12 +688,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const already = state.obrigacoes.some((o) => {
           if (o.filhoId !== filhoId) return false
           if (o.loteId && o.loteId === loteId) return true
-          const oNome = (o.nome ?? '').trim().toLowerCase()
-          return oNome === nomeKey && o.data === data
+          return o.tipoId === tipoId && o.data === data
         })
         if (already) {
           skipped += 1
           continue
+        }
+
+        const payload: Omit<Obrigacao, 'id'> & { id?: string } = {
+          filhoId,
+          tipoId,
+          data,
+          observacoes: input.observacoes?.trim() || undefined,
+          itens: input.itens ?? [],
+          loteId,
         }
 
         if (!isDbUuid(filhoId)) {
@@ -654,30 +710,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
             ...prev,
             obrigacoes: [
               ...prev.obrigacoes,
-              {
-                id: uid('o'),
-                filhoId,
-                tipoId: 'manual',
-                data,
-                nome,
-                observacoes: input.observacoes?.trim() || undefined,
-                itens: input.itens ?? [],
-                loteId,
-              },
+              { ...payload, id: uid('o') },
             ],
           }))
           continue
         }
 
-        const remote = await createObrigacaoViaApi({
-          filhoId,
-          tipoId: 'manual',
-          data,
-          nome,
-          observacoes: input.observacoes?.trim() || undefined,
-          itens: input.itens ?? [],
-          loteId,
-        })
+        const remote = await createObrigacaoViaApi(payload)
 
         if (remote.ok === true) {
           created += 1
@@ -703,16 +742,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             ...prev,
             obrigacoes: [
               ...prev.obrigacoes,
-              {
-                id: uid('o'),
-                filhoId,
-                tipoId: 'manual',
-                data,
-                nome,
-                observacoes: input.observacoes?.trim() || undefined,
-                itens: input.itens ?? [],
-                loteId,
-              },
+              { ...payload, id: uid('o') },
             ],
           }))
           continue
@@ -732,27 +762,152 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       return { ok: true, created, skipped, error: lastError }
     },
-    [state.obrigacoes],
+    [state.obrigacoes, state.tipos],
   )
 
-  const toggleTipo = useCallback((id: ObligationTypeId) => {
-    setState((prev) => ({
-      ...prev,
-      tipos: prev.tipos.map((t) =>
-        t.id === id ? { ...t, active: !t.active } : t,
-      ),
-    }))
+  const addTipo = useCallback(async (input: ObrigacaoTipoInput) => {
+    const nome = input.name.trim()
+    if (!nome) return { ok: false, error: 'nome_required' }
+    const remote = await createObrigacaoTipoViaApi({
+      ...input,
+      name: nome,
+    })
+    if (remote.ok === true) {
+      setState((prev) => ({
+        ...prev,
+        tipos: [...prev.tipos, remote.tipo].sort((a, b) =>
+          a.name.localeCompare(b.name, 'pt-BR'),
+        ),
+      }))
+      return { ok: true, tipo: remote.tipo }
+    }
+    if (
+      remote.error === 'network' ||
+      remote.error.startsWith('http_5') ||
+      remote.error.startsWith('http_') ||
+      remote.error === 'supabase_unconfigured'
+    ) {
+      const tipo: ObligationType = {
+        id: input.id?.trim() || uid('ot'),
+        name: nome,
+        description: (input.description ?? '').trim(),
+        yearsOffset:
+          input.yearsOffset != null && Number(input.yearsOffset) > 0
+            ? Math.floor(Number(input.yearsOffset))
+            : null,
+        isFestiva: Boolean(input.isFestiva),
+        color: (input.color ?? '#6B5B4A').trim() || '#6B5B4A',
+        active: true,
+        itensPadrao: input.itensPadrao?.map((i) => ({ ...i })),
+      }
+      setState((prev) => ({
+        ...prev,
+        tipos: [...prev.tipos, tipo].sort((a, b) =>
+          a.name.localeCompare(b.name, 'pt-BR'),
+        ),
+      }))
+      return { ok: true, tipo }
+    }
+    return { ok: false, error: remote.error }
   }, [])
 
   const updateTipo = useCallback(
-    (id: ObligationTypeId, patch: Partial<ObligationType>) => {
-      setState((prev) => ({
-        ...prev,
-        tipos: prev.tipos.map((t) => (t.id === id ? { ...t, ...patch } : t)),
-      }))
+    async (
+      id: ObligationTypeId,
+      patch: Partial<ObrigacaoTipoInput> & { active?: boolean },
+    ) => {
+      const remote = await updateObrigacaoTipoViaApi(id, patch)
+      if (remote.ok === true) {
+        setState((prev) => ({
+          ...prev,
+          tipos: prev.tipos.map((t) => (t.id === id ? remote.tipo : t)),
+        }))
+        return { ok: true, tipo: remote.tipo }
+      }
+      if (
+        remote.error === 'network' ||
+        remote.error.startsWith('http_5') ||
+        remote.error.startsWith('http_') ||
+        remote.error === 'supabase_unconfigured'
+      ) {
+        let updated: ObligationType | undefined
+        setState((prev) => ({
+          ...prev,
+          tipos: prev.tipos.map((t) => {
+            if (t.id !== id) return t
+            updated = {
+              ...t,
+              ...(patch.name != null ? { name: patch.name.trim() } : {}),
+              ...(patch.description != null
+                ? { description: patch.description.trim() }
+                : {}),
+              ...('yearsOffset' in patch
+                ? {
+                    yearsOffset:
+                      patch.yearsOffset != null &&
+                      Number(patch.yearsOffset) > 0
+                        ? Math.floor(Number(patch.yearsOffset))
+                        : null,
+                  }
+                : {}),
+              ...(patch.isFestiva != null
+                ? { isFestiva: Boolean(patch.isFestiva) }
+                : {}),
+              ...(patch.color != null
+                ? { color: patch.color.trim() || t.color }
+                : {}),
+              ...(patch.active != null ? { active: Boolean(patch.active) } : {}),
+              ...(patch.itensPadrao != null
+                ? { itensPadrao: patch.itensPadrao.map((i) => ({ ...i })) }
+                : {}),
+            }
+            return updated
+          }),
+        }))
+        if (!updated) return { ok: false, error: 'not_found' }
+        return { ok: true, tipo: updated }
+      }
+      return { ok: false, error: remote.error }
     },
     [],
   )
+
+  const toggleTipo = useCallback(
+    async (id: ObligationTypeId) => {
+      const current = state.tipos.find((t) => t.id === id)
+      if (!current) return { ok: false, error: 'not_found' }
+      return updateTipo(id, { active: !current.active })
+    },
+    [state.tipos, updateTipo],
+  )
+
+  const deleteTipo = useCallback(async (id: ObligationTypeId) => {
+    const remote = await deleteObrigacaoTipoViaApi(id)
+    if (remote.ok === true) {
+      setState((prev) => ({
+        ...prev,
+        tipos: prev.tipos.filter((t) => t.id !== id),
+      }))
+      return { ok: true }
+    }
+    if (remote.error === 'in_use') {
+      return { ok: false, error: 'in_use' }
+    }
+    if (
+      remote.error === 'network' ||
+      remote.error.startsWith('http_5') ||
+      remote.error.startsWith('http_') ||
+      remote.error === 'supabase_unconfigured' ||
+      remote.error === 'not_found'
+    ) {
+      setState((prev) => ({
+        ...prev,
+        tipos: prev.tipos.filter((t) => t.id !== id),
+      }))
+      return { ok: true }
+    }
+    return { ok: false, error: remote.error }
+  }, [])
 
   const addCobranca = useCallback(async (cobranca: CobrancaInput) => {
     if (!isDbUuid(cobranca.filhoId)) {
@@ -1019,8 +1174,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updateObrigacao,
       deleteObrigacao,
       replicateObrigacao,
-      toggleTipo,
+      addTipo,
       updateTipo,
+      toggleTipo,
+      deleteTipo,
       addCobranca,
       updateCobranca,
       markCobrancaPago,
@@ -1049,8 +1206,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updateObrigacao,
       deleteObrigacao,
       replicateObrigacao,
-      toggleTipo,
+      addTipo,
       updateTipo,
+      toggleTipo,
+      deleteTipo,
       addCobranca,
       updateCobranca,
       markCobrancaPago,
