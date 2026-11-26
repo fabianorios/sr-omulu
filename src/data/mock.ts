@@ -78,7 +78,7 @@ export const DEFAULT_TIPOS: ObligationType[] = [
     id: 'manual',
     name: 'Obrigação manual',
     description:
-      'Criada pelo admin com data e itens informados manualmente (sem cálculo de ciclo).',
+      'Legado: obrigações criadas antes do catálogo unificado (sem ciclo automático).',
     yearsOffset: null,
     color: '#6B5B4A',
     active: true,

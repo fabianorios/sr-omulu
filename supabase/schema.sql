@@ -63,6 +63,27 @@ create table if not exists public.cobrancas (
 create index if not exists cobrancas_filho_idx on public.cobrancas (filho_id);
 create index if not exists cobrancas_vencimento_idx on public.cobrancas (vencimento);
 
+create table if not exists public.obrigacao_tipos (
+  id text primary key,
+  nome text not null,
+  description text not null default '',
+  years_offset int,
+  is_festiva boolean not null default false,
+  color text not null default '#6B5B4A',
+  ativo boolean not null default true,
+  itens_padrao jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint obrigacao_tipos_years_chk check (
+    years_offset is null or years_offset > 0
+  )
+);
+
+create unique index if not exists obrigacao_tipos_nome_uidx
+  on public.obrigacao_tipos (lower(trim(nome)));
+create index if not exists obrigacao_tipos_ativo_idx
+  on public.obrigacao_tipos (ativo);
+
 create table if not exists public.obrigacoes (
   id uuid primary key default gen_random_uuid(),
   filho_id text not null,
@@ -127,6 +148,7 @@ create index if not exists sessoes_expires_idx on public.sessoes (expires_at);
 alter table public.filhos enable row level security;
 alter table public.cobranca_tipos enable row level security;
 alter table public.cobrancas enable row level security;
+alter table public.obrigacao_tipos enable row level security;
 alter table public.obrigacoes enable row level security;
 alter table public.usuarios enable row level security;
 alter table public.sessoes enable row level security;
