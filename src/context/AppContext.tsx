@@ -32,12 +32,14 @@ import {
   saveLocalFilhos,
   updateFilhoViaApi,
 } from '../lib/filhosApi'
+import { isDbUuid } from '../lib/ids'
 import {
   createObrigacaoViaApi,
   deleteObrigacaoViaApi,
   loadObrigacoesFromApi,
   updateObrigacaoViaApi,
 } from '../lib/obrigacoesApi'
+import { supabaseBrowserConfigured } from '../lib/supabaseBrowser'
 import type {
   AppState,
   Cobranca,
@@ -151,7 +153,20 @@ function scopeSampleForUser(
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const { user, isAdmin } = useAuth()
-  const [state, setState] = useState<AppState>(() => createInitialState())
+  const [state, setState] = useState<AppState>(() => {
+    const initial = createInitialState()
+    // Avoid flashing mock ids (f11, …) before remote load on production.
+    if (supabaseBrowserConfigured()) {
+      return {
+        ...initial,
+        filhos: [],
+        obrigacoes: [],
+        cobrancas: [],
+        dataSource: 'supabase',
+      }
+    }
+    return initial
+  })
   const [loadingFilhos, setLoadingFilhos] = useState(true)
   const [openNovoFilho, setOpenNovoFilho] = useState(false)
   const [editingFilho, setEditingFilho] = useState<Filho | null>(null)
@@ -189,32 +204,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setState((prev) => {
         let next: AppState = { ...prev }
         const initial = createInitialState()
+        // Production (Supabase/Postgres): never hydrate mock ids (f11, …).
+        // Sample/demo is only for local /api without a remote DB, or explicit resetDemo.
+        const remoteConnected =
+          remoteFilhos.source === 'supabase' ||
+          remoteFilhos.source === 'postgres' ||
+          remoteFilhos.source === 'pglite' ||
+          supabaseBrowserConfigured()
 
         if (
           remoteFilhos.source === 'supabase' ||
           remoteFilhos.source === 'postgres' ||
           remoteFilhos.source === 'pglite'
         ) {
-          if (remoteFilhos.filhos.length === 0) {
-            if (isAdmin) {
-              const local = loadLocalFilhos()
-              const filhos =
-                local.length > 0 ? local : createSampleFilhos()
-              next = {
-                ...next,
-                filhos,
-                dataSource: local.length > 0 ? 'local' : 'sample',
-              }
-            } else {
-              next = { ...next, filhos: [], dataSource: remoteFilhos.source }
-            }
-          } else {
-            next = {
-              ...next,
-              filhos: remoteFilhos.filhos,
-              dataSource: remoteFilhos.source,
-            }
+          next = {
+            ...next,
+            filhos: remoteFilhos.filhos,
+            dataSource: remoteFilhos.source,
           }
+        } else if (remoteConnected) {
+          next = { ...next, filhos: [], dataSource: 'supabase' }
         } else if (isAdmin) {
           const local = loadLocalFilhos()
           next = {
@@ -235,7 +244,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           next = { ...next, obrigacoes: remoteObr.obrigacoes }
         } else if (next.dataSource === 'sample' && isAdmin) {
           next = { ...next, obrigacoes: initial.obrigacoes }
-        } else if (!isAdmin) {
+        } else if (remoteConnected || !isAdmin) {
           next = { ...next, obrigacoes: [] }
         }
 
@@ -251,11 +260,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
             next = { ...next, cobrancas: remoteFin.cobrancas }
           } else if (next.dataSource === 'sample' && isAdmin) {
             next = { ...next, cobrancas: createSampleCobrancas() }
-          } else if (!isAdmin) {
-            next = { ...next, cobrancas: [] }
           } else {
-            const localC = loadLocalCobrancas()
-            if (localC.length > 0) next = { ...next, cobrancas: localC }
+            next = { ...next, cobrancas: [] }
+          }
+        } else if (remoteConnected) {
+          next = {
+            ...next,
+            cobrancas: [],
+            cobrancaTipos: DEFAULT_COBRANCA_TIPOS.map((t) => ({ ...t })),
           }
         } else if (isAdmin) {
           const localC = loadLocalCobrancas()
@@ -290,6 +302,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [user?.id, user?.filhoId, isAdmin])
 
   const resetDemo = useCallback(() => {
+    // Local demo only. With Supabase configured this must not replace DB UUIDs
+    // in a way that later deletes send mock ids (f11) to Postgres.
+    if (supabaseBrowserConfigured()) {
+      window.alert(
+        'Dados de exemplo ficam só no modo local. Em produção use os cadastros do banco (UUID).',
+      )
+      return
+    }
     const next = createInitialState()
     saveLocalFilhos([])
     saveLocalCobrancas([])
@@ -329,6 +349,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const updateFilho = useCallback(async (id: string, filho: FilhoInput) => {
+    if (!isDbUuid(id)) {
+      if (supabaseBrowserConfigured()) {
+        return {
+          ok: false,
+          error:
+            'id_invalido: use o UUID do cadastro no banco, não id de exemplo',
+        }
+      }
+      setState((prev) => {
+        const filhos = applyLocalUpdate(prev.filhos, id, filho)
+        saveLocalFilhos(filhos)
+        return { ...prev, filhos, dataSource: 'local' }
+      })
+      return { ok: true }
+    }
+
     const remote = await updateFilhoViaApi(id, filho)
     if (remote.ok === true) {
       setState((prev) => ({
@@ -367,6 +403,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const deleteFilho = useCallback(async (id: string) => {
+    if (!isDbUuid(id)) {
+      if (supabaseBrowserConfigured()) {
+        return {
+          ok: false,
+          error:
+            'id_invalido: use o UUID do cadastro no banco, não id de exemplo (ex.: f11)',
+        }
+      }
+      setState((prev) => {
+        const filhos = prev.filhos.filter((f) => f.id !== id)
+        const cobrancas = prev.cobrancas.filter((c) => c.filhoId !== id)
+        saveLocalFilhos(filhos)
+        saveLocalCobrancas(cobrancas)
+        return {
+          ...prev,
+          filhos,
+          obrigacoes: prev.obrigacoes.filter((o) => o.filhoId !== id),
+          cobrancas,
+          dataSource: 'local',
+        }
+      })
+      return { ok: true }
+    }
+
     const remote = await deleteFilhoViaApi(id)
     if (remote.ok === true) {
       setState((prev) => ({
@@ -415,6 +475,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ...obrigacao,
         itens: obrigacao.itens ?? [],
       }
+      if (!isDbUuid(payload.filhoId)) {
+        if (supabaseBrowserConfigured()) {
+          return {
+            ok: false,
+            error:
+              'id_invalido: filho_id deve ser o UUID do cadastro no banco',
+          }
+        }
+        setState((prev) => ({
+          ...prev,
+          obrigacoes: [
+            ...prev.obrigacoes,
+            { ...payload, id: obrigacao.id ?? uid('o') },
+          ],
+        }))
+        return { ok: true }
+      }
       const remote = await createObrigacaoViaApi(payload)
       if (remote.ok === true) {
         setState((prev) => ({
@@ -445,6 +522,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const updateObrigacao = useCallback(
     async (id: string, patch: Partial<Obrigacao>) => {
+      if (
+        !isDbUuid(id) ||
+        (patch.filhoId != null && !isDbUuid(patch.filhoId))
+      ) {
+        if (supabaseBrowserConfigured()) {
+          return {
+            ok: false,
+            error:
+              'id_invalido: use o UUID do cadastro no banco, não id de exemplo',
+          }
+        }
+        setState((prev) => ({
+          ...prev,
+          obrigacoes: prev.obrigacoes.map((o) =>
+            o.id === id ? { ...o, ...patch, id } : o,
+          ),
+        }))
+        return { ok: true }
+      }
       const remote = await updateObrigacaoViaApi(id, patch)
       if (remote.ok === true) {
         setState((prev) => ({
@@ -467,6 +563,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   )
 
   const deleteObrigacao = useCallback(async (id: string) => {
+    if (!isDbUuid(id)) {
+      if (supabaseBrowserConfigured()) {
+        return {
+          ok: false,
+          error:
+            'id_invalido: use o UUID do cadastro no banco, não id de exemplo',
+        }
+      }
+      setState((prev) => ({
+        ...prev,
+        obrigacoes: prev.obrigacoes.filter((o) => o.id !== id),
+      }))
+      return { ok: true }
+    }
     const remote = await deleteObrigacaoViaApi(id)
     if (remote.ok === true) {
       setState((prev) => ({
@@ -520,6 +630,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       let lastError: string | undefined
 
       for (const filhoId of filhoIds) {
+        if (!isDbUuid(filhoId)) {
+          if (supabaseBrowserConfigured()) {
+            lastError =
+              'id_invalido: filho_id deve ser o UUID do cadastro no banco'
+            continue
+          }
+        }
         const already = state.obrigacoes.some((o) => {
           if (o.filhoId !== filhoId) return false
           if (o.loteId && o.loteId === loteId) return true
@@ -528,6 +645,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
         })
         if (already) {
           skipped += 1
+          continue
+        }
+
+        if (!isDbUuid(filhoId)) {
+          created += 1
+          setState((prev) => ({
+            ...prev,
+            obrigacoes: [
+              ...prev.obrigacoes,
+              {
+                id: uid('o'),
+                filhoId,
+                tipoId: 'manual',
+                data,
+                nome,
+                observacoes: input.observacoes?.trim() || undefined,
+                itens: input.itens ?? [],
+                loteId,
+              },
+            ],
+          }))
           continue
         }
 
@@ -617,6 +755,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
   )
 
   const addCobranca = useCallback(async (cobranca: CobrancaInput) => {
+    if (!isDbUuid(cobranca.filhoId)) {
+      if (supabaseBrowserConfigured()) {
+        return {
+          ok: false,
+          error:
+            'id_invalido: filho_id deve ser o UUID do cadastro no banco',
+        }
+      }
+      const created: Cobranca = {
+        ...cobranca,
+        id: cobranca.id ?? uid('c'),
+        pago: cobranca.pago ?? false,
+      }
+      setState((prev) => {
+        const cobrancas = [...prev.cobrancas, created]
+        saveLocalCobrancas(cobrancas)
+        return { ...prev, cobrancas }
+      })
+      return { ok: true }
+    }
     const remote = await createCobrancaViaApi(cobranca)
     if (remote.ok === true) {
       setState((prev) => ({
@@ -648,6 +806,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const updateCobranca = useCallback(
     async (id: string, patch: Partial<CobrancaInput> & { pago?: boolean }) => {
+      if (
+        !isDbUuid(id) ||
+        (patch.filhoId != null && !isDbUuid(patch.filhoId))
+      ) {
+        if (supabaseBrowserConfigured()) {
+          return {
+            ok: false,
+            error:
+              'id_invalido: use o UUID do cadastro no banco, não id de exemplo',
+          }
+        }
+        setState((prev) => {
+          const cobrancas = prev.cobrancas.map((c) => {
+            if (c.id !== id) return c
+            const next: Cobranca = { ...c, ...patch, id: c.id }
+            if (patch.pago != null) {
+              next.pago = patch.pago
+              next.pagoEm = patch.pago
+                ? new Date().toISOString()
+                : undefined
+            }
+            return next
+          })
+          saveLocalCobrancas(cobrancas)
+          return { ...prev, cobrancas }
+        })
+        return { ok: true }
+      }
       const remote = await updateCobrancaViaApi(id, patch)
       if (remote.ok === true) {
         setState((prev) => ({
@@ -690,6 +876,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [updateCobranca])
 
   const deleteCobranca = useCallback(async (id: string) => {
+    if (!isDbUuid(id)) {
+      if (supabaseBrowserConfigured()) {
+        return {
+          ok: false,
+          error:
+            'id_invalido: use o UUID do cadastro no banco, não id de exemplo',
+        }
+      }
+      setState((prev) => {
+        const cobrancas = prev.cobrancas.filter((c) => c.id !== id)
+        saveLocalCobrancas(cobrancas)
+        return { ...prev, cobrancas }
+      })
+      return { ok: true }
+    }
     const remote = await deleteCobrancaViaApi(id)
     if (remote.ok === true) {
       setState((prev) => {

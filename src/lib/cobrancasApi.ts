@@ -5,6 +5,7 @@ import type {
   CobrancaTipo,
 } from '../types'
 import { parseDbSource, type RemoteDbSource } from './dbSource'
+import { isDbUuid } from './ids'
 import { supabaseBrowserConfigured } from './supabaseBrowser'
 import {
   sbCreateCobranca,
@@ -157,6 +158,9 @@ export async function createCobrancaViaApi(
   | { ok: true; cobranca: Cobranca; source: RemoteDbSource }
   | { ok: false; error: string }
 > {
+  if (!isDbUuid(cobranca.filhoId)) {
+    return { ok: false, error: 'invalid_id' }
+  }
   if (supabaseBrowserConfigured()) {
     const remote = await sbCreateCobranca(cobranca)
     if (remote.ok === false) return { ok: false, error: remote.error }
@@ -198,6 +202,9 @@ export async function updateCobrancaViaApi(
   | { ok: true; cobranca: Cobranca; source: RemoteDbSource }
   | { ok: false; error: string }
 > {
+  if (!isDbUuid(id) || (patch.filhoId != null && !isDbUuid(patch.filhoId))) {
+    return { ok: false, error: 'invalid_id' }
+  }
   if (supabaseBrowserConfigured()) {
     const remote = await sbUpdateCobranca(id, patch)
     if (remote.ok === false) return { ok: false, error: remote.error }
@@ -317,6 +324,9 @@ export async function updateCobrancaTipoViaApi(
 export async function deleteCobrancaViaApi(
   id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isDbUuid(id)) {
+    return { ok: false, error: 'invalid_id' }
+  }
   if (supabaseBrowserConfigured()) {
     const remote = await sbDeleteCobranca(id)
     if (remote.ok === false) return { ok: false, error: remote.error }

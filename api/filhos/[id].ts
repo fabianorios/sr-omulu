@@ -23,6 +23,8 @@ const TIPOS = new Set([
   'Pomba-Gira',
   'Preto Velho',
 ])
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 function idFromUrl(request: Request): string | null {
   const url = new URL(request.url)
@@ -52,6 +54,9 @@ export async function GET(request: Request): Promise<Response> {
 
   const id = idFromUrl(request)
   if (!id) return json({ error: 'missing_id' }, 400)
+  if (!UUID_RE.test(id.trim())) {
+    return json({ error: 'invalid_id' }, 400)
+  }
   if (!canAccessFilho(session, id)) {
     return json({ error: 'forbidden' }, 403)
   }
@@ -74,6 +79,9 @@ export async function PATCH(request: Request): Promise<Response> {
 
   const id = idFromUrl(request)
   if (!id) return json({ error: 'missing_id' }, 400)
+  if (!UUID_RE.test(id.trim())) {
+    return json({ error: 'invalid_id' }, 400)
+  }
   if (!canAccessFilho(session, id)) {
     return json({ error: 'forbidden' }, 403)
   }
@@ -194,6 +202,9 @@ export async function DELETE(request: Request): Promise<Response> {
 
   const id = idFromUrl(request)
   if (!id) return json({ error: 'missing_id' }, 400)
+  if (!UUID_RE.test(id.trim())) {
+    return json({ error: 'invalid_id' }, 400)
+  }
 
   try {
     // filho_id is text without FK cascade — remove dependents first

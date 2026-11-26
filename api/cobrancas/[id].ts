@@ -9,6 +9,8 @@ import { dbMode } from '../../lib/db'
 
 type CobrancaRow = Record<string, unknown> & { filho_id?: string }
 const CATS = new Set(['mensalidade', 'contribuicao', 'outro'])
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 function idFromUrl(request: Request): string | null {
   const parts = new URL(request.url).pathname.split('/').filter(Boolean)
@@ -29,6 +31,9 @@ export async function PATCH(request: Request): Promise<Response> {
 
   const id = idFromUrl(request)
   if (!id) return json({ error: 'missing_id' }, 400)
+  if (!UUID_RE.test(id.trim())) {
+    return json({ error: 'invalid_id' }, 400)
+  }
 
   const existing = await loadCobranca(id)
   if (!existing) return json({ error: 'not_found' }, 404)
@@ -58,7 +63,11 @@ export async function PATCH(request: Request): Promise<Response> {
   }
 
   if (isAdmin && ('filhoId' in body || 'filho_id' in body)) {
-    push('filho_id', String(body.filhoId ?? body.filho_id).trim())
+    const filhoId = String(body.filhoId ?? body.filho_id).trim()
+    if (!UUID_RE.test(filhoId)) {
+      return json({ error: 'invalid_id' }, 400)
+    }
+    push('filho_id', filhoId)
   }
   if (isAdmin && ('tipoNome' in body || 'tipo_nome' in body)) {
     push('tipo_nome', String(body.tipoNome ?? body.tipo_nome).trim())
@@ -124,6 +133,9 @@ export async function DELETE(request: Request): Promise<Response> {
 
   const id = idFromUrl(request)
   if (!id) return json({ error: 'missing_id' }, 400)
+  if (!UUID_RE.test(id.trim())) {
+    return json({ error: 'invalid_id' }, 400)
+  }
 
   try {
     const rows = await sql<{ id: string }>(

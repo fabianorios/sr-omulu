@@ -9,6 +9,9 @@ import { dbMode } from '../../lib/db'
 
 type ObrigacaoRow = Record<string, unknown> & { filho_id?: string }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
 function idFromUrl(request: Request): string | null {
   const parts = new URL(request.url).pathname.split('/').filter(Boolean)
   const last = parts[parts.length - 1]
@@ -42,6 +45,9 @@ export async function PATCH(request: Request): Promise<Response> {
 
   const id = idFromUrl(request)
   if (!id) return json({ error: 'missing_id' }, 400)
+  if (!UUID_RE.test(id.trim())) {
+    return json({ error: 'invalid_id' }, 400)
+  }
 
   let body: Record<string, unknown>
   try {
@@ -59,6 +65,9 @@ export async function PATCH(request: Request): Promise<Response> {
 
   if ('filhoId' in body || 'filho_id' in body) {
     const filhoId = String(body.filhoId ?? body.filho_id).trim()
+    if (!UUID_RE.test(filhoId)) {
+      return json({ error: 'invalid_id' }, 400)
+    }
     if (!canAccessFilho(session, filhoId)) {
       return json({ error: 'forbidden' }, 403)
     }
@@ -131,6 +140,9 @@ export async function DELETE(request: Request): Promise<Response> {
 
   const id = idFromUrl(request)
   if (!id) return json({ error: 'missing_id' }, 400)
+  if (!UUID_RE.test(id.trim())) {
+    return json({ error: 'invalid_id' }, 400)
+  }
 
   try {
     const rows = await sql<{ id: string }>(

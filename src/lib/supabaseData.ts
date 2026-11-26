@@ -7,6 +7,7 @@ import type { Obrigacao } from '../types'
 import type { CobrancaInput, CobrancaCategoria } from '../types'
 import { sanitizeEntidadesForSave } from './entidades'
 import { emptyEndereco } from '../types'
+import { isDbUuid } from './ids'
 
 function filhoInsert(filho: FilhoInput) {
   const endereco = filho.endereco ?? emptyEndereco()
@@ -66,6 +67,7 @@ export async function sbUpdateFilho(
   id: string,
   filho: FilhoInput,
 ): Promise<{ ok: true; row: FilhoRow } | { ok: false; error: string }> {
+  if (!isDbUuid(id)) return { ok: false, error: 'invalid_id' }
   const sb = getSupabaseBrowser()
   if (!sb) return { ok: false, error: 'supabase_unconfigured' }
   const { data, error } = await sb
@@ -81,6 +83,7 @@ export async function sbUpdateFilho(
 export async function sbDeleteFilho(
   id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isDbUuid(id)) return { ok: false, error: 'invalid_id' }
   const sb = getSupabaseBrowser()
   if (!sb) return { ok: false, error: 'supabase_unconfigured' }
   // filho_id is text without FK cascade — remove dependents first
@@ -114,6 +117,7 @@ export async function sbLoadObrigacoes(): Promise<
 export async function sbCreateObrigacao(
   o: Omit<Obrigacao, 'id'> & { id?: string },
 ): Promise<{ ok: true; row: ObrigacaoRow } | { ok: false; error: string }> {
+  if (!isDbUuid(o.filhoId)) return { ok: false, error: 'invalid_id' }
   const sb = getSupabaseBrowser()
   if (!sb) return { ok: false, error: 'supabase_unconfigured' }
   const { data, error } = await sb
@@ -147,6 +151,9 @@ export async function sbUpdateObrigacao(
   id: string,
   patch: Partial<Obrigacao>,
 ): Promise<{ ok: true; row: ObrigacaoRow } | { ok: false; error: string }> {
+  if (!isDbUuid(id) || (patch.filhoId != null && !isDbUuid(patch.filhoId))) {
+    return { ok: false, error: 'invalid_id' }
+  }
   const sb = getSupabaseBrowser()
   if (!sb) return { ok: false, error: 'supabase_unconfigured' }
   const body: Record<string, unknown> = { updated_at: new Date().toISOString() }
@@ -171,6 +178,7 @@ export async function sbUpdateObrigacao(
 export async function sbDeleteObrigacao(
   id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isDbUuid(id)) return { ok: false, error: 'invalid_id' }
   const sb = getSupabaseBrowser()
   if (!sb) return { ok: false, error: 'supabase_unconfigured' }
   const { error } = await sb.from('obrigacoes').delete().eq('id', id)
@@ -205,6 +213,7 @@ export async function sbLoadCobrancas(): Promise<
 export async function sbCreateCobranca(
   cobranca: CobrancaInput,
 ): Promise<{ ok: true; row: CobrancaRow } | { ok: false; error: string }> {
+  if (!isDbUuid(cobranca.filhoId)) return { ok: false, error: 'invalid_id' }
   const sb = getSupabaseBrowser()
   if (!sb) return { ok: false, error: 'supabase_unconfigured' }
   const { data, error } = await sb
@@ -231,6 +240,9 @@ export async function sbUpdateCobranca(
   id: string,
   patch: Partial<CobrancaInput> & { pago?: boolean },
 ): Promise<{ ok: true; row: CobrancaRow } | { ok: false; error: string }> {
+  if (!isDbUuid(id) || (patch.filhoId != null && !isDbUuid(patch.filhoId))) {
+    return { ok: false, error: 'invalid_id' }
+  }
   const sb = getSupabaseBrowser()
   if (!sb) return { ok: false, error: 'supabase_unconfigured' }
   const body: Record<string, unknown> = { updated_at: new Date().toISOString() }
@@ -260,6 +272,7 @@ export async function sbUpdateCobranca(
 export async function sbDeleteCobranca(
   id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isDbUuid(id)) return { ok: false, error: 'invalid_id' }
   const sb = getSupabaseBrowser()
   if (!sb) return { ok: false, error: 'supabase_unconfigured' }
   const { error } = await sb.from('cobrancas').delete().eq('id', id)

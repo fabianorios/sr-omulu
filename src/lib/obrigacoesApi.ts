@@ -1,5 +1,6 @@
 import type { Obrigacao, ObrigacaoItem, ObligationTypeId } from '../types'
 import { parseDbSource, type RemoteDbSource } from './dbSource'
+import { isDbUuid } from './ids'
 import { supabaseBrowserConfigured } from './supabaseBrowser'
 import {
   sbCreateObrigacao,
@@ -126,6 +127,9 @@ export async function createObrigacaoViaApi(
   | { ok: true; obrigacao: Obrigacao; source: RemoteDbSource }
   | { ok: false; error: string }
 > {
+  if (!isDbUuid(obrigacao.filhoId)) {
+    return { ok: false, error: 'invalid_id' }
+  }
   if (supabaseBrowserConfigured()) {
     const remote = await sbCreateObrigacao(obrigacao)
     if (remote.ok === false) return { ok: false, error: remote.error }
@@ -167,6 +171,9 @@ export async function updateObrigacaoViaApi(
   | { ok: true; obrigacao: Obrigacao; source: RemoteDbSource }
   | { ok: false; error: string }
 > {
+  if (!isDbUuid(id) || (patch.filhoId != null && !isDbUuid(patch.filhoId))) {
+    return { ok: false, error: 'invalid_id' }
+  }
   if (supabaseBrowserConfigured()) {
     const remote = await sbUpdateObrigacao(id, patch)
     if (remote.ok === false) return { ok: false, error: remote.error }
@@ -213,6 +220,9 @@ export async function updateObrigacaoViaApi(
 export async function deleteObrigacaoViaApi(
   id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isDbUuid(id)) {
+    return { ok: false, error: 'invalid_id' }
+  }
   if (supabaseBrowserConfigured()) {
     const remote = await sbDeleteObrigacao(id)
     if (remote.ok === false) return { ok: false, error: remote.error }

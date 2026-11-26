@@ -12,6 +12,8 @@ type CobrancaRow = Record<string, unknown>
 type TipoRow = Record<string, unknown>
 
 const CATS = new Set(['mensalidade', 'contribuicao', 'outro'])
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 export async function GET(request: Request): Promise<Response> {
   const session = await requireAppSession(request)
@@ -59,6 +61,9 @@ export async function POST(request: Request): Promise<Response> {
 
   if (!filhoId || !tipoNome || !vencimento || !Number.isFinite(valor)) {
     return json({ error: 'missing_fields' }, 400)
+  }
+  if (!UUID_RE.test(filhoId)) {
+    return json({ error: 'invalid_id' }, 400)
   }
   if (!CATS.has(categoria)) return json({ error: 'invalid_categoria' }, 400)
   if (!canAccessFilho(session, filhoId)) {

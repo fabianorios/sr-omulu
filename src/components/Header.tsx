@@ -1,6 +1,7 @@
 import { LogOut, Menu } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
+import { supabaseBrowserConfigured } from '../lib/supabaseBrowser'
 import { Logo } from './Logo'
 
 type HeaderProps = {
@@ -60,12 +61,12 @@ export function Header({ onOpenMenu }: HeaderProps) {
         >
           {SOURCE_LABEL[state.dataSource]}
         </span>
-        {isAdmin ? (
+        {isAdmin && !supabaseBrowserConfigured() ? (
           <button
             type="button"
             onClick={resetDemo}
             className="rounded border border-[var(--color-forest)]/40 bg-[var(--color-forest)] px-2.5 py-1.5 text-[10px] font-semibold tracking-wide text-[var(--color-cream)] uppercase transition hover:bg-[var(--color-forest-hover)] sm:px-3 sm:text-[11px]"
-            title="Restaurar dados de exemplo"
+            title="Restaurar dados de exemplo (somente modo local)"
           >
             <span className="sm:hidden">Exemplo</span>
             <span className="hidden sm:inline">Dados de exemplo</span>
